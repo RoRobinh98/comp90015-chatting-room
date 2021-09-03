@@ -19,15 +19,6 @@ public class Server {
         new Server().handle();
     }
 
-    public static String ridicule(String in) {
-        Random random = new Random();
-        StringBuilder sb = new StringBuilder();
-        for (char c : in.toCharArray()) {
-            sb.append(random.nextBoolean() ? c : Character.toUpperCase(c));
-        }
-        return sb.toString();
-    }
-
     public void handle() {
         ServerSocket serverSocket;
         // we want to accept incoming tcp connections on port 6379
@@ -120,7 +111,7 @@ public class Server {
                         // we can log this to stdout
                         System.out.printf("%d: %s\n", socket.getPort(), inputLine);
                         // lets return this back, or "echo" what we receive
-                        writer.print(ridicule(inputLine));
+                        writer.print(inputLine);
                         // lets ensure that we terminate it with a \n
                         writer.println();
                         // lets flush our buffer (just in case)
