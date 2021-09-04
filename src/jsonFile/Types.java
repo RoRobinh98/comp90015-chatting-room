@@ -6,9 +6,10 @@ package jsonFile;
  * @apiNote
  */
 public enum Types {
-    MESSAGE("message");
+    MESSAGE("message"),
+    NEWIDENTITY("newidentity");
 
-    String type;
+    public String type;
     Types(String type) {
         this.type = type;
     }
