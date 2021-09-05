@@ -1,10 +1,19 @@
+import Identity.ChatRoom;
+import Identity.User;
+import com.google.gson.Gson;
+import jsonFile.General;
+import jsonFile.NewIdentity;
+import jsonFile.Types;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Random;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @author JiazheHou
@@ -13,117 +22,146 @@ import java.util.Random;
  */
 public class Server {
     public static final int port = 6379;
+    private static final String MAINHALL = "MainHall";
     private boolean handler_alive = false;
+    private ArrayList<User> users;
+    private ArrayList<ChatRoom> chatRooms;
+    private volatile List<ChatConnection> connectionList;
 
     public static void main(String[] args) {
         new Server().handle();
     }
 
+    public Server() {
+        users = new ArrayList<>();
+        chatRooms = new ArrayList<>();
+        chatRooms.add(new ChatRoom(MAINHALL));
+        connectionList = new ArrayList<>();
+    }
+
     public void handle() {
         ServerSocket serverSocket;
-        // we want to accept incoming tcp connections on port 6379
-        // java has the SocketServer class that enables us to listen on this port
-        // do the tcp dance and then offload a socket to us, which we then use to communicate
-        // lets do that
         try {
-
-            // lastly, lets log when we starting listening and when we recv a new connection.
-            // That way we can easily see whats happening from the console.
-
-            // we want to listen on port
             serverSocket = new ServerSocket(port);
 
             System.out.printf("Listening on port %d\n", port);
             handler_alive = true;
 
-            // lets start accepting connections
             while (handler_alive) {
-                // with the serverSocket.accept() method we can construct a new socket
-                // this will only get called when a new connection is being established
                 Socket newSocket = serverSocket.accept();
-                // lets now be good programmers and encapsulate this into its own object
-                EchoConnection conn = new EchoConnection(newSocket);
+                ChatConnection conn = new ChatConnection(newSocket);
 
                 if (conn != null) {
-                    // we have accepted a new connection, lets log it
                     System.out.printf("Accepted new connection from %s:%d\n", newSocket.getLocalAddress().getCanonicalHostName(), newSocket.getPort());
-
-                    // finally, lets do some stuff with the socket inside the new object;
-                    conn.run();
+                    enter(conn);
+                    conn.start();
                 } else {
                     handler_alive = false;
                 }
 
             }
         } catch (IOException e) {
-            // this also potentially throws an exception, so we will need to handle that (later)
-            // if we get an IO exception here, there really is a big issue. We may not be able to recover
-            // lets exit
             System.out.printf("Error handling conns, %s\n", e.getMessage());
             handler_alive = false;
         }
     }
 
-    class EchoConnection {
+    private void enter(Server.ChatConnection connection) {
+        broadCast(String.format("%d has joined the chat",connection.socket.getPort()), null);
+        connectionList.add(connection);
+    }
+
+    private void leave(Server.ChatConnection connection) {
+        broadCast(String.format("%d has left the chat",connection.socket.getPort()), connection);
+        connectionList.remove(connection);
+        users.remove(connection.user);
+    }
+
+    private synchronized void broadCast(String message, Server.ChatConnection ignored) {
+        for(Server.ChatConnection connection:connectionList) {
+            if(ignored == null || ignored.equals(connection)){
+                connection.sendMessage(message);
+            }
+        }
+    }
+
+    class ChatConnection extends Thread{
         private Socket socket;
         private PrintWriter writer;
         private BufferedReader reader;
         private boolean connection_alive;
+        private Gson gson = new Gson();
+        private User user;
 
-        public EchoConnection(Socket socket) throws IOException {
-            // when we called the constructor, we created a reader and writer
+        public ChatConnection(Socket socket) throws IOException {
             this.socket = socket;
-            this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream())); // we wrap these in some IO utility classes to make our life easier
-            this.writer = new PrintWriter(socket.getOutputStream()); // likewise
+            this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            this.writer = new PrintWriter(socket.getOutputStream());
+        }
+
+        public void initialize() {
+            String tempName = getTempIdentity(users);
+            user = new User(tempName,socket.getLocalAddress().getCanonicalHostName(),socket.getPort());
+            System.out.println(user.getIdentity());
+            users.add(user);
+            ChatRoom.selectById(chatRooms,MAINHALL).addRoomUser(user);
+
+            General newidentity = new General(Types.NEWIDENTITY.type);
+            newidentity.setIdentity(tempName);
+            newidentity.setFormer("");
+            writer.print(gson.toJson(newidentity));
+            writer.println();
+            writer.flush();
         }
 
         public void close() {
-            // we want to close all our streams and the socket itself
-            // this could also be an IOException so lets wrap it
             try {
+                leave(this);
                 reader.close();
                 writer.close();
                 socket.close();
             } catch (IOException e) {
-                // we cant really do much here, lets just log the issue and continue
                 System.out.println("Error closing conn");
             }
         }
 
         public void run() {
             connection_alive = true;
+            initialize();
             while (connection_alive) {
-                // now lets handle this connection
-                // we will have it running in an infinite loop, that terminates when we set the flag connection_alive to false
-
-                // same as before here, we could have the issue of IOExceptions as we read/write
                 try {
-                    // lets read from the socket inputStream
-                    // luckily, we can read up until the new line char (\n) or \r\n
-
-                    // we might also read the null byte, (-1) in which case we should also kill this connection
                     String inputLine = reader.readLine();
                     if (inputLine == null) {
-                        // bad write, close
                         connection_alive = false;
                     } else {
-                        // good write, honor
-                        // we can log this to stdout
                         System.out.printf("%d: %s\n", socket.getPort(), inputLine);
-                        // lets return this back, or "echo" what we receive
                         writer.print(inputLine);
-                        // lets ensure that we terminate it with a \n
                         writer.println();
-                        // lets flush our buffer (just in case)
                         writer.flush();
                     }
                 } catch (IOException e) {
-                    // if we get an IOException here, its probably best to kill the connection
                     connection_alive = false;
                 }
             }
-            // lastly, lets handle closing the connection if we can... gracefully
             close();
+        }
+
+        public void sendMessage(String message) {
+            writer.print(message);
+            writer.flush();
+        }
+
+        String getTempIdentity(ArrayList<User> userList){
+            int i = 1;
+            List<Integer> usedNum = userList.stream().map(User::getIdentity).map(identity -> Integer.parseInt(identity.substring(5,identity.length()))).collect(Collectors.toList());
+            while(true){
+                if(usedNum.contains(i)){
+                    i++;
+                }
+                else
+                    break;
+            }
+            return "guest"+i;
         }
     }
 }
