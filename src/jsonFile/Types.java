@@ -7,7 +7,8 @@ package jsonFile;
  */
 public enum Types {
     MESSAGE("message"),
-    NEWIDENTITY("newidentity");
+    NEWIDENTITY("newidentity"),
+    IDENTITYCHANGE("identityChange");
 
     public String type;
     Types(String type) {

@@ -83,4 +83,18 @@ public class General {
     public void setContent(String content) {
         this.content = content;
     }
+
+    @Override
+    public String toString() {
+        return "General{" +
+                "type='" + type + '\'' +
+                ", identity='" + identity + '\'' +
+                ", former='" + former + '\'' +
+                ", roomid='" + roomid + '\'' +
+                ", identities=" + identities +
+                ", owner='" + owner + '\'' +
+                ", rooms=" + rooms +
+                ", content='" + content + '\'' +
+                '}';
+    }
 }

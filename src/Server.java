@@ -79,7 +79,7 @@ public class Server {
 
     private synchronized void broadCast(String message, Server.ChatConnection ignored) {
         for(Server.ChatConnection connection:connectionList) {
-            if(ignored == null || ignored.equals(connection)){
+            if(ignored == null || !ignored.equals(connection)){
                 connection.sendMessage(message);
             }
         }
@@ -109,6 +109,7 @@ public class Server {
             General newidentity = new General(Types.NEWIDENTITY.type);
             newidentity.setIdentity(tempName);
             newidentity.setFormer("");
+            System.out.println(gson.toJson(newidentity));
             writer.print(gson.toJson(newidentity));
             writer.println();
             writer.flush();
@@ -131,9 +132,15 @@ public class Server {
             while (connection_alive) {
                 try {
                     String inputLine = reader.readLine();
+                    General message = gson.fromJson(inputLine,General.class);
+                    System.out.println(message);
                     if (inputLine == null) {
                         connection_alive = false;
-                    } else {
+                    }else if("identityChange".equals(message.getType())){
+                        identityChange(message);
+                    }
+
+                    else {
                         System.out.printf("%d: %s\n", socket.getPort(), inputLine);
                         writer.print(inputLine);
                         writer.println();
@@ -162,6 +169,48 @@ public class Server {
                     break;
             }
             return "guest"+i;
+        }
+
+        /**
+        * @Description: identityChange
+        * @Author: Yuanyi Zhang
+        * @Date: 2021/9/6
+        */
+        public void identityChange(General inputLine) throws IOException {
+            Boolean flag = true;
+            Server.ChatConnection client = null;
+            General message = new General(Types.NEWIDENTITY.type);
+            String tempName = inputLine.getFormer();
+            String newIdentity = inputLine.getIdentity();
+            for(Server.ChatConnection connection : connectionList){
+                if(connection.user.getIdentity().equals(newIdentity)){
+                    flag = false;
+                    if(connection.user.getIdentity().equals(tempName)){
+                        client = connection;
+                    }
+                }
+                else if(connection.user.getIdentity().equals(tempName)){
+                    client = connection;
+                }
+            }
+            if(!flag){
+                message.setFormer("");
+                message.setIdentity(tempName);
+                message.setContent("Requested identity invalid or in use");
+                client.sendMessage(gson.toJson(message));
+            }else{
+                message.setFormer(tempName);
+                message.setIdentity(newIdentity);
+                message.setContent(tempName + " is now " + newIdentity);
+                client.user.setFormer(tempName);
+                client.user.setIdentity(newIdentity);
+                client.sendMessage(gson.toJson(message));
+                message.setContent("User " + tempName + " has changed his username to: " + newIdentity);
+                broadCast(gson.toJson(message), client);
+            }
+
+            socket.shutdownOutput();
+
         }
     }
 }

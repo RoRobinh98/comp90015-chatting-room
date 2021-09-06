@@ -72,13 +72,13 @@ public class Client {
         public void run() throws IOException {
             connection_alive = true;
             while (connection_alive == true){
+                Boolean messageSent = false;
                 String inputLine = reader.readLine();
                 if (inputLine == null) {
                     // bad write, close
                     connection_alive = false;
                 } else {
                     General fromServer = gson.fromJson(inputLine,General.class);
-                    System.out.println(fromServer.getType());
                     if (fromServer.getType().equals(Types.NEWIDENTITY.type) && fromServer.getFormer().equals("")) {
                         this.identity = fromServer.getIdentity();
                         this.currentRoomId = "MainHail";
@@ -86,28 +86,77 @@ public class Client {
                         System.out.println();
 
                     }
+                    //identify changed and output message
+                    else if(fromServer.getType().equals(Types.NEWIDENTITY.type) && !fromServer.getIdentity().equals(this.identity)){
+                        this.identity = fromServer.getIdentity();
+                        System.out.println(fromServer.getContent());
 
+                    }
+
+//                    System.out.printf("[MainHall] %s>",this.identity );
+                }
+
+                while(messageSent == false) {
                     System.out.printf("[MainHall] %s>",this.identity );
-                }
+                    Scanner scanner = new Scanner(System.in);
+                    String input = scanner.nextLine();
+                    String[] input1 = input.split(" ");
+                    if (input != null && !"#".equals(input.substring(0, 1))) {
+                        General message = new General(Types.MESSAGE.type);
+                        message.setContent(input);
+                        input = gson.toJson(message);
+                        writer.print(input);
+                        writer.println();
+                        writer.flush();
+                        messageSent = true;
+                    } else{
+                        //TODO 不是发言，视为命令
+                        if("#".equals(input.substring(0, 1))){
+                            switch (input1[0].substring(1)){
+                                case "identityChange":
+                                    messageSent = identityChange(input1[1]);
+                                    break;
+                            }
+                        }
 
-                Scanner scanner = new Scanner(System.in);
-                String input = scanner.nextLine();
-                if (input != null && input.substring(0,1) != "#") {
-                    General message = new General(Types.MESSAGE.type);
-                    message.setContent(input);
-                    input = gson.toJson(message);
-                    writer.print(input);
-                    writer.println();
-                    writer.flush();
+//                        messageSent = identityChange(input);
+                    }
                 }
-                else {
-                    //TODO 不是发言，视为命令
-                }
-
 
             }
             
             close();
+        }
+
+        /**
+        * @Description: identityChange
+        * @Author: Yuanyi Zhang
+        * @Date: 2021/9/6
+        */
+        public boolean identityChange(String input){
+
+            if (input.length() >= 3 && input.length() <= 16) {
+                if( input.substring(0,1).matches("[A-Za-z]") && input.matches("^[A-Za-z0-9]+$")){
+                    General command = new General(Types.IDENTITYCHANGE.type);
+                    command.setFormer(this.identity);
+                    command.setIdentity(input);
+                    input = gson.toJson(command);
+                    writer.print(input);
+                    writer.println();
+                    writer.flush();
+                    return true;
+                }
+                else{
+                    System.out.println("Starting with an upper or lower case character");
+                    System.out.println("And upper and lower case characters only and digits");
+                }
+            } else {
+                System.out.println("The identity must be at least 3 characters " +
+                        "and no more than 16 characters");
+            }
+            return false;
+
+
         }
     }
 
