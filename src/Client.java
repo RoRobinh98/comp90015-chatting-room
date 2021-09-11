@@ -91,8 +91,8 @@ public class Client {
                         this.identity = fromServer.getIdentity();
                         System.out.println(fromServer.getContent());
 
-                    }
-
+                    }else if(fromServer.getType().equals(Types.ROOMLIST.type) || fromServer.getType().equals(Types.MESSAGE.type))
+                        System.out.println(fromServer.getContent());
 //                    System.out.printf("[MainHall] %s>",this.identity );
                 }
 
@@ -113,13 +113,20 @@ public class Client {
                         //TODO 不是发言，视为命令
                         if("#".equals(input.substring(0, 1))){
                             switch (input1[0].substring(1)){
-                                case "identityChange":
+                                case "identitychange":
                                     messageSent = identityChange(input1[1]);
                                     break;
+                                case "creatroom":
+                                    messageSent = createRoom(input1[1]);
+                                    break;
+                                case "roomchange":
+                                    roomChange(input1[1]);
+                                    break;
+
+
                             }
                         }
 
-//                        messageSent = identityChange(input);
                     }
                 }
 
@@ -134,7 +141,6 @@ public class Client {
         * @Date: 2021/9/6
         */
         public boolean identityChange(String input){
-
             if (input.length() >= 3 && input.length() <= 16) {
                 if( input.substring(0,1).matches("[A-Za-z]") && input.matches("^[A-Za-z0-9]+$")){
                     General command = new General(Types.IDENTITYCHANGE.type);
@@ -155,9 +161,46 @@ public class Client {
                         "and no more than 16 characters");
             }
             return false;
-
-
         }
+
+
+        /**
+         * @Description: roomChange
+         * @Author: Yuanyi Zhang
+         * @Date: 9/11/2021
+         */
+        public boolean createRoom(String input){
+            if (input.length() >= 3 && input.length() <= 32) {
+                if( input.substring(0,1).matches("[A-Za-z]") && input.matches("^[A-Za-z0-9]+$")){
+                    General command = new General(Types.CREATEROOM.type);
+                    command.setRoomid(input);
+                    input = gson.toJson(command);
+                    writer.print(input);
+                    writer.println();
+                    writer.flush();
+                    return true;
+                }
+                else{
+                    System.out.println("Starting with an upper or lower case character");
+                    System.out.println("And upper and lower case characters only and digits");
+                }
+            }
+            else {
+                System.out.println("The room name must be at least 3 characters " +
+                        "and no more than 32 characters");
+            }
+            return false;
+        }
+
+        public void roomChange(String input){
+            General command = new General(Types.JOIN.type);
+            command.setRoomid(input);
+            input = gson.toJson(command);
+            writer.print(input);
+            writer.println();
+            writer.flush();
+        }
+
     }
 
 

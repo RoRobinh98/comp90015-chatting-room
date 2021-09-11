@@ -36,6 +36,10 @@ public class ChatRoom {
         this.roomUsers.add(user);
     }
 
+    public void removeRoomUser(User user){
+        this.roomUsers.remove(user);
+    }
+
     public static ChatRoom selectById(ArrayList<ChatRoom> chatRooms, String id){
         for (ChatRoom chatRoom:chatRooms){
             if(chatRoom.getId().equals(id)){

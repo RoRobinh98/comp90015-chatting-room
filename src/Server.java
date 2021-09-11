@@ -5,6 +5,7 @@ import jsonFile.General;
 import jsonFile.NewIdentity;
 import jsonFile.Types;
 
+import javax.swing.text.StyledEditorKit;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -67,25 +68,32 @@ public class Server {
     }
 
     private void enter(Server.ChatConnection connection) {
-        broadCast(String.format("%d has joined the chat",connection.socket.getPort()), null);
+        broadCast(String.format("%d has joined the chat", connection.socket.getPort()), null);
         connectionList.add(connection);
     }
 
     private void leave(Server.ChatConnection connection) {
-        broadCast(String.format("%d has left the chat",connection.socket.getPort()), connection);
+        broadCast(String.format("%d has left the chat", connection.socket.getPort()), connection);
         connectionList.remove(connection);
         users.remove(connection.user);
     }
 
     private synchronized void broadCast(String message, Server.ChatConnection ignored) {
-        for(Server.ChatConnection connection:connectionList) {
-            if(ignored == null || !ignored.equals(connection)){
+        for (Server.ChatConnection connection : connectionList) {
+            if (ignored == null || !ignored.equals(connection)) {
                 connection.sendMessage(message);
             }
         }
     }
 
-    class ChatConnection extends Thread{
+    private synchronized void broadCast(String message, ArrayList<ChatRoom> chatRoom, String roomName) {
+        ChatRoom room = ChatRoom.selectById(chatRoom, roomName);
+        for (User user : room.getRoomUsers()) {
+            connectionList.get(connectionList.indexOf(user)).sendMessage(message);
+        }
+    }
+
+    class ChatConnection extends Thread {
         private Socket socket;
         private PrintWriter writer;
         private BufferedReader reader;
@@ -101,10 +109,10 @@ public class Server {
 
         public void initialize() {
             String tempName = getTempIdentity(users);
-            user = new User(tempName,socket.getLocalAddress().getCanonicalHostName(),socket.getPort());
+            user = new User(tempName, socket.getLocalAddress().getCanonicalHostName(), socket.getPort());
             System.out.println(user.getIdentity());
             users.add(user);
-            ChatRoom.selectById(chatRooms,MAINHALL).addRoomUser(user);
+            ChatRoom.selectById(chatRooms, MAINHALL).addRoomUser(user);
 
             General newidentity = new General(Types.NEWIDENTITY.type);
             newidentity.setIdentity(tempName);
@@ -132,15 +140,16 @@ public class Server {
             while (connection_alive) {
                 try {
                     String inputLine = reader.readLine();
-                    General message = gson.fromJson(inputLine,General.class);
-                    System.out.println(message);
+                    General message = gson.fromJson(inputLine, General.class);
                     if (inputLine == null) {
                         connection_alive = false;
-                    }else if("identityChange".equals(message.getType())){
+                    } else if ("identitychange".equals(message.getType())) {
                         identityChange(message);
-                    }
-
-                    else {
+                    } else if ("createroom".equals(message.getType()))
+                        createRoom(message);
+                    else if ("roomchange".equals(message.getType())) {
+                        roomChange(message);
+                    } else {
                         System.out.printf("%d: %s\n", socket.getPort(), inputLine);
                         writer.print(inputLine);
                         writer.println();
@@ -158,47 +167,45 @@ public class Server {
             writer.flush();
         }
 
-        String getTempIdentity(ArrayList<User> userList){
+        String getTempIdentity(ArrayList<User> userList) {
             int i = 1;
-            List<Integer> usedNum = userList.stream().map(User::getIdentity).map(identity -> Integer.parseInt(identity.substring(5,identity.length()))).collect(Collectors.toList());
-            while(true){
-                if(usedNum.contains(i)){
+            List<Integer> usedNum = userList.stream().map(User::getIdentity).map(identity -> Integer.parseInt(identity.substring(5, identity.length()))).collect(Collectors.toList());
+            while (true) {
+                if (usedNum.contains(i)) {
                     i++;
-                }
-                else
+                } else
                     break;
             }
-            return "guest"+i;
+            return "guest" + i;
         }
 
         /**
-        * @Description: identityChange
-        * @Author: Yuanyi Zhang
-        * @Date: 2021/9/6
-        */
+         * @Description: identityChange
+         * @Author: Yuanyi Zhang
+         * @Date: 2021/9/6
+         */
         public void identityChange(General inputLine) throws IOException {
             Boolean flag = true;
             Server.ChatConnection client = null;
             General message = new General(Types.NEWIDENTITY.type);
             String tempName = inputLine.getFormer();
             String newIdentity = inputLine.getIdentity();
-            for(Server.ChatConnection connection : connectionList){
-                if(connection.user.getIdentity().equals(newIdentity)){
+            for (Server.ChatConnection connection : connectionList) {
+                if (connection.user.getIdentity().equals(newIdentity)) {
                     flag = false;
-                    if(connection.user.getIdentity().equals(tempName)){
+                    if (connection.user.getIdentity().equals(tempName)) {
                         client = connection;
                     }
-                }
-                else if(connection.user.getIdentity().equals(tempName)){
+                } else if (connection.user.getIdentity().equals(tempName)) {
                     client = connection;
                 }
             }
-            if(!flag){
+            if (!flag) {
                 message.setFormer("");
                 message.setIdentity(tempName);
                 message.setContent("Requested identity invalid or in use");
                 client.sendMessage(gson.toJson(message));
-            }else{
+            } else {
                 message.setFormer(tempName);
                 message.setIdentity(newIdentity);
                 message.setContent(tempName + " is now " + newIdentity);
@@ -212,5 +219,85 @@ public class Server {
             socket.shutdownOutput();
 
         }
+
+        /**
+         * @Description: roomChange
+         * @Author: Yuanyi Zhang
+         * @Date: 9/11/2021
+         */
+        public void createRoom(General inputLine) throws IOException {
+            Boolean flag = false;
+            String roomName = inputLine.getRoomid();
+            Server.ChatConnection client = null;
+            System.out.println("test");
+            System.out.println(socket.getPort());
+
+            for (Server.ChatConnection connection : connectionList) {
+                if (connection.socket.getPort() == (socket.getPort())) {
+                    client = connection;
+                }
+            }
+
+            for (ChatRoom room : chatRooms) {
+                if (room.getId().equals(roomName)) {
+                    General message = new General(Types.MESSAGE.type);
+                    message.setContent("Room " + roomName + " is invalid or already in use.");
+                    client.sendMessage(gson.toJson(message));
+                    return;
+                }
+            }
+            chatRooms.add(new ChatRoom(roomName));
+            General message = new General(Types.ROOMLIST.type);
+            message.setContent("Room " + roomName + " created");
+
+            //TODO reply a ROOMLIST message
+            for(ChatRoom room: chatRooms){
+                System.out.println(room.getId());
+                System.out.println(room.getRoomUsers().size());
+            }
+            client.sendMessage(gson.toJson(message));
+
+
+            socket.shutdownOutput();
+        }
+
+
+        //TODO
+        public void roomChange(General inputLine) {
+            Boolean flag = false;
+            General message = new General(Types.ROOMCHANGE.type);
+            Server.ChatConnection client = null;
+            String roomName = inputLine.getRoomid();
+            for (Server.ChatConnection connection : connectionList) {
+                if (connection.socket.getPort() == (socket.getPort())) {
+                    client = connection;
+                }
+                for (ChatRoom room : chatRooms) {
+                    if (room.equals(roomName)) {
+                        flag = true;
+                    }
+                }
+                if (!flag) {
+                    message.setIdentity(client.user.getIdentity());
+                    message.setContent("The requested room is invalid or non existent");
+                    client.sendMessage(gson.toJson(message));
+                } else {
+                    message.setIdentity(client.user.getIdentity());
+                    if (client.user.getRoomid().equals("")) {
+                        message.setFormer(MAINHALL);
+                        message.setContent(client.user.getIdentity() + " moved from MainHall to " + roomName);
+                    } else {
+                        message.setFormer(client.user.getRoomid());
+                        message.setContent(client.user.getIdentity() + " moved from + " + client.user.getRoomid() + " to " + roomName);
+                    }
+                    message.setRoomid(roomName);
+
+                    ChatRoom.selectById(chatRooms, roomName).addRoomUser(client.user);
+//                ChatRoom.selectById(chatRooms,MAINHALL);
+                    broadCast(gson.toJson(message), chatRooms, roomName);
+                }
+            }
+        }
+
     }
 }
