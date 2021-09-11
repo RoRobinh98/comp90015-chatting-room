@@ -8,7 +8,11 @@ package jsonFile;
 public enum Types {
     MESSAGE("message"),
     NEWIDENTITY("newidentity"),
-    IDENTITYCHANGE("identityChange");
+    IDENTITYCHANGE("identitychange"),
+    CREATEROOM("createroom"),
+    ROOMLIST("roomlist"),
+    ROOMCHANGE("roomchange"),
+    JOIN("join");
 
     public String type;
     Types(String type) {

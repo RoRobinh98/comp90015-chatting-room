@@ -9,6 +9,7 @@ public class User {
     private String identity;
     private String hostName;
     private String former; //new added 2021/9/6
+    private String roomid;//new added 2021/9/6
     private int port;
 
     public User(String identity, String hostName, int port) {
@@ -16,6 +17,8 @@ public class User {
         this.hostName = hostName;
         this.port = port;
         this.former = "";
+        this.roomid = "";
+
     }
 
     public String getIdentity() {
@@ -33,4 +36,14 @@ public class User {
     public void setFormer(String former) {
         this.former = former;
     }
+
+    public String getRoomid() {
+        return roomid;
+    }
+
+    public void setRoomid(String roomid) {
+        this.roomid = roomid;
+    }
+
+    public int getPort(){return port;}
 }
