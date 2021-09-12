@@ -111,6 +111,7 @@ public class Server {
             user = new User(tempName, socket.getLocalAddress().getCanonicalHostName(), socket.getPort());
             users.add(user);
             ChatRoom.selectById(chatRooms, MAINHALL).addRoomUser(user);
+            user.setRoomid(MAINHALL);
 
             General newidentity = new General(Types.NEWIDENTITY.type);
             newidentity.setIdentity(tempName);
@@ -330,7 +331,10 @@ public class Server {
                 successfulChange.setRoomid(targetRoomId);
                 broadCast(gson.toJson(successfulChange), chatRooms, this.user.getRoomid());
                 broadCast(gson.toJson(successfulChange), chatRooms, targetRoomId);
+                ChatRoom.selectById(chatRooms,this.user.getRoomid()).removeRoomUser(this.user);
+                ChatRoom.selectById(chatRooms,targetRoomId).addRoomUser(this.user);
                 this.user.setRoomid(targetRoomId);
+
                 if (targetRoomId.equals(MAINHALL)) {
                     General mainHallContent = new General(Types.ROOMCONTENTS.type);
                     mainHallContent.setRoomid(MAINHALL);
