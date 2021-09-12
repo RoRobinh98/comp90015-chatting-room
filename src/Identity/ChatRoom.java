@@ -10,10 +10,24 @@ import java.util.ArrayList;
 public class ChatRoom {
     private String id;
     private ArrayList<User> roomUsers;
+    private String owner;
 
     public ChatRoom(String id) {
         this.id = id;
         this.roomUsers = new ArrayList<>();
+    }
+
+    public ChatRoom(String id, String owner){
+        this.id = id;
+        this.owner = owner;
+    }
+
+    public String getOwner() {
+        return owner;
+    }
+
+    public void setOwner(String owner) {
+        this.owner = owner;
     }
 
     public String getId() {

@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import jsonFile.General;
 import jsonFile.Types;
 
-import javax.swing.text.StyledEditorKit;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -35,7 +34,7 @@ public class Server {
     public Server() {
         users = new ArrayList<>();
         chatRooms = new ArrayList<>();
-        chatRooms.add(new ChatRoom(MAINHALL));
+        chatRooms.add(new ChatRoom(MAINHALL,""));
         connectionList = new ArrayList<>();
     }
 
@@ -143,11 +142,15 @@ public class Server {
                         connection_alive = false;
                     } else if (Types.IDENTITYCHANGE.type.equals(message.getType())) {
                         identityChange(message);
-                    } else if (Types.CREATEROOM.type.equals(message.getType()))
+                    } else if (Types.CREATEROOM.type.equals(message.getType())) {
                         createRoom(message);
-                    else if (Types.ROOMCHANGE.type.equals(message.getType())) {
+                    } else if (Types.ROOMCHANGE.type.equals(message.getType())) {
                         roomChange(message);
-                    } else if(Types.MESSAGE.type.equals(message.getType())){
+                    } else if(Types.JOIN.type.equals(message.getType())) {
+
+                    }
+
+                    else if(Types.MESSAGE.type.equals(message.getType())){
                         broadcastMessage(message);
                     }
                 } catch (IOException e) {
@@ -299,6 +302,41 @@ public class Server {
             message.setIdentity(this.user.getIdentity());
             message.setContent(inputLine.getContent());
             broadCast(gson.toJson(message), chatRooms, this.user.getRoomid());
+        }
+
+        public void joinRoom(General inputLine) {
+            String targetRoomId = inputLine.getRoomid();
+            if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)) {
+                General failToChange = new General(Types.ROOMCHANGE.type);
+                failToChange.setIdentity(this.user.getIdentity());
+                failToChange.setFormer(this.user.getRoomid());
+                failToChange.setRoomid(this.user.getRoomid());
+                sendMessage(gson.toJson(failToChange));
+            }
+            else {
+                General successfulChange = new General(Types.ROOMCHANGE.type);
+                successfulChange.setIdentity(this.user.getIdentity());
+                successfulChange.setFormer(this.user.getRoomid());
+                successfulChange.setRoomid(targetRoomId);
+                broadCast(gson.toJson(successfulChange), chatRooms, this.user.getRoomid());
+                broadCast(gson.toJson(successfulChange), chatRooms, targetRoomId);
+                this.user.setRoomid(targetRoomId);
+                if (targetRoomId.equals(MAINHALL)) {
+                    //TODO mainhall
+                    General mainHallContent = new General(Types.ROOMCONTENTS.type);
+                    mainHallContent.setRoomid(MAINHALL);
+                    mainHallContent.setIdentities(getRoomUserIds(ChatRoom.selectById(chatRooms, MAINHALL)));
+                    mainHallContent.setOwner(ChatRoom.selectById(chatRooms, MAINHALL).getOwner());
+                    General roomList = new General(Types.ROOMLIST.type);
+
+                }
+            }
+        }
+
+        ArrayList<String> getRoomUserIds(ChatRoom chatRoom){
+            ArrayList<String> result = new ArrayList<>();
+            result.addAll(chatRoom.getRoomUsers().stream().map(User::getIdentity).collect(Collectors.toList()));
+            return result;
         }
 
     }

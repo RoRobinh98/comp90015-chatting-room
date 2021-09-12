@@ -12,7 +12,8 @@ public enum Types {
     CREATEROOM("createroom"),
     ROOMLIST("roomlist"),
     ROOMCHANGE("roomchange"),
-    JOIN("join");
+    JOIN("join"),
+    ROOMCONTENTS("roomcontents"),;
 
     public String type;
     Types(String type) {

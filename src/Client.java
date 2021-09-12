@@ -122,7 +122,9 @@ public class Client {
                                 case "roomchange":
                                     roomChange(input1[1]);
                                     break;
-
+                                case "join":
+                                    messageSent = joinRoom(input1[1]);
+                                    break;
 
                             }
                         }
@@ -200,6 +202,17 @@ public class Client {
             writer.println();
             writer.flush();
         }
+
+        public boolean joinRoom(String input){
+            General command = new General(Types.JOIN.type);
+            command.setRoomid(input);
+            writer.print(gson.toJson(command));
+            writer.println();
+            writer.flush();
+            return true;
+        }
+
+
 
     }
 
