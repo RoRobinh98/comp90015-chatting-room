@@ -2,7 +2,6 @@ import Identity.ChatRoom;
 import Identity.User;
 import com.google.gson.Gson;
 import jsonFile.General;
-import jsonFile.NewIdentity;
 import jsonFile.Types;
 
 import javax.swing.text.StyledEditorKit;
@@ -110,7 +109,6 @@ public class Server {
         public void initialize() {
             String tempName = getTempIdentity(users);
             user = new User(tempName, socket.getLocalAddress().getCanonicalHostName(), socket.getPort());
-            System.out.println(user.getIdentity());
             users.add(user);
             ChatRoom.selectById(chatRooms, MAINHALL).addRoomUser(user);
 
@@ -143,17 +141,14 @@ public class Server {
                     General message = gson.fromJson(inputLine, General.class);
                     if (inputLine == null) {
                         connection_alive = false;
-                    } else if ("identitychange".equals(message.getType())) {
+                    } else if (Types.IDENTITYCHANGE.type.equals(message.getType())) {
                         identityChange(message);
-                    } else if ("createroom".equals(message.getType()))
+                    } else if (Types.CREATEROOM.type.equals(message.getType()))
                         createRoom(message);
-                    else if ("roomchange".equals(message.getType())) {
+                    else if (Types.ROOMCHANGE.type.equals(message.getType())) {
                         roomChange(message);
-                    } else {
-                        System.out.printf("%d: %s\n", socket.getPort(), inputLine);
-                        writer.print(inputLine);
-                        writer.println();
-                        writer.flush();
+                    } else if(Types.MESSAGE.type.equals(message.getType())){
+                        broadcastMessage(message);
                     }
                 } catch (IOException e) {
                     connection_alive = false;
@@ -169,7 +164,7 @@ public class Server {
 
         String getTempIdentity(ArrayList<User> userList) {
             int i = 1;
-            List<Integer> usedNum = userList.stream().map(User::getIdentity).map(identity -> Integer.parseInt(identity.substring(5, identity.length()))).collect(Collectors.toList());
+            List<Integer> usedNum = userList.stream().map(User::getIdentity).map(identity -> Integer.parseInt(identity.substring(5))).collect(Collectors.toList());
             while (true) {
                 if (usedNum.contains(i)) {
                     i++;
@@ -297,6 +292,13 @@ public class Server {
                     broadCast(gson.toJson(message), chatRooms, roomName);
                 }
             }
+        }
+
+        public void broadcastMessage(General inputLine) {
+            General message = new General(Types.MESSAGE.type);
+            message.setIdentity(this.user.getIdentity());
+            message.setContent(inputLine.getContent());
+            broadCast(gson.toJson(message), chatRooms, this.user.getRoomid());
         }
 
     }

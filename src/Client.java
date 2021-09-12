@@ -72,6 +72,7 @@ public class Client {
         public void run() throws IOException {
             connection_alive = true;
             while (connection_alive == true){
+
                 Boolean messageSent = false;
                 String inputLine = reader.readLine();
                 if (inputLine == null) {
@@ -93,11 +94,10 @@ public class Client {
 
                     }else if(fromServer.getType().equals(Types.ROOMLIST.type) || fromServer.getType().equals(Types.MESSAGE.type))
                         System.out.println(fromServer.getContent());
-//                    System.out.printf("[MainHall] %s>",this.identity );
                 }
 
                 while(messageSent == false) {
-                    System.out.printf("[MainHall] %s>",this.identity );
+                    System.out.printf("[%s] %s>",this.currentRoomId, this.identity );
                     Scanner scanner = new Scanner(System.in);
                     String input = scanner.nextLine();
                     String[] input1 = input.split(" ");
