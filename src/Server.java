@@ -376,6 +376,11 @@ public class Server {
                     chatRoom.setOwner("");
                 }
             }
+            ChatRoom currentRoom = ChatRoom.selectById(chatRooms,this.user.getRoomid());
+            currentRoom.removeRoomUser(this.user);
+            if(currentRoom.getRoomUsers().size() == 0 && currentRoom.getOwner().equals("")){
+                chatRooms.remove(currentRoom);
+            }
         }
 
         ArrayList<String> getRoomUserIds(ChatRoom chatRoom){
