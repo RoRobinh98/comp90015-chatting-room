@@ -14,7 +14,7 @@ public class General {
     private String roomid;
     private ArrayList<String> identities;
     private String owner;
-    private ArrayList<String> rooms;
+    private ArrayList<Room> rooms;
     private String content;
 
     public General(String type) {
@@ -68,11 +68,11 @@ public class General {
         this.owner = owner;
     }
 
-    public ArrayList<String> getRooms() {
+    public ArrayList<Room> getRooms() {
         return rooms;
     }
 
-    public void setRooms(ArrayList<String> rooms) {
+    public void setRooms(ArrayList<Room> rooms) {
         this.rooms = rooms;
     }
 

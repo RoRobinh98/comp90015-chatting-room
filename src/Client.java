@@ -6,11 +6,13 @@
 
 import com.google.gson.Gson;
 import jsonFile.General;
+import jsonFile.Room;
 import jsonFile.Types;
 
 import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Scanner;
 
 public class Client {
@@ -26,10 +28,6 @@ public class Client {
             while (handler_alive) {
                 ChatClient conn = new ChatClient(socket);
                 if (conn != null) {
-                    // we have accepted a new connection, lets log it
-                    System.out.printf("Accepted new connection from %s:%d\n", socket.getLocalAddress().getCanonicalHostName(), socket.getPort());
-
-                    // finally, lets do some stuff with the socket inside the new object;
                     conn.run();
                 } else {
                     handler_alive = false;
@@ -61,6 +59,8 @@ public class Client {
 
         public void close() {
             try {
+                System.out.printf("Disconnected from %s",socket.getLocalAddress().getCanonicalHostName());
+                System.out.println();
                 reader.close();
                 writer.close();
                 socket.close();
@@ -92,8 +92,41 @@ public class Client {
                         this.identity = fromServer.getIdentity();
                         System.out.println(fromServer.getContent());
 
-                    }else if(fromServer.getType().equals(Types.ROOMLIST.type) || fromServer.getType().equals(Types.MESSAGE.type))
+                    }
+                    else if(fromServer.getType().equals(Types.MESSAGE.type))
                         System.out.println(fromServer.getContent());
+                    else if(fromServer.getType().equals(Types.ROOMCHANGE.type)){
+                        if(fromServer.getFormer().equals(fromServer.getRoomid())){
+                            System.out.println("The requested room is invalid or non existent");
+                        }
+                        else if(fromServer.getRoomid().equals("")){
+                            System.out.printf("%s leaves %s",fromServer.getIdentity(),fromServer.getFormer());
+                            System.out.println();
+                            if(fromServer.getIdentity().equals(this.identity)){
+                                connection_alive = false;
+                            }
+                        }
+                        else{
+                            System.out.printf("%s moved from %s to %s",fromServer.getIdentity(), fromServer.getFormer(), fromServer.getRoomid());
+                            if (fromServer.getIdentity().equals(this.identity))
+                            this.currentRoomId = fromServer.getRoomid();
+                        }
+                    }
+                    else if(fromServer.getType().equals(Types.ROOMCONTENTS.type)){
+                       if(fromServer.getRoomid().equals("")) {
+                           System.out.println("The requested room is invalid or non existent");
+                       }
+                       else {
+                           if (fromServer.getIdentities().size() == 0)
+                               System.out.println(fromServer.getRoomid()+ " has no one in the room currently");
+                           else
+                               System.out.println(fromServer.getRoomid()+" contains "+ allUserIds(fromServer.getIdentities(), fromServer.getOwner()));
+                       }
+                    }
+                    else if(fromServer.getType().equals(Types.ROOMLIST.type)){
+                        listAllRooms(fromServer.getRooms());
+                    }
+
                 }
 
                 while(messageSent == false) {
@@ -125,7 +158,13 @@ public class Client {
                                 case "join":
                                     messageSent = joinRoom(input1[1]);
                                     break;
-
+                                case "who":
+                                    messageSent = askWho(input1[1]);
+                                    break;
+                                case "list":
+                                    messageSent = askList();
+                                case "quit":
+                                    messageSent = askQuit();
                             }
                         }
 
@@ -212,8 +251,46 @@ public class Client {
             return true;
         }
 
+        public boolean askWho(String input){
+            General command = new General(Types.WHO.type);
+            command.setRoomid(input);
+            writer.print(gson.toJson(command));
+            writer.println();
+            writer.flush();
+            return true;
+        }
 
+        public boolean askList(){
+            General command = new General(Types.LIST.type);
+            writer.print(gson.toJson(command));
+            writer.println();
+            writer.flush();
+            return true;
+        }
 
+        public boolean askQuit(){
+            General command = new General(Types.QUIT.type);
+            writer.print(gson.toJson(command));
+            writer.println();
+            writer.flush();
+            return true;
+        }
+
+        String allUserIds(ArrayList<String> identities, String owner){
+            String result = "";
+            for (String identity:identities){
+                result = result+" "+identity;
+                if(identity.equals(owner))
+                    result = result+"*";
+            }
+            return result;
+        }
+
+        void listAllRooms(ArrayList<Room> rooms){
+            for (Room room:rooms){
+                System.out.println(room.toString() + " guest(s)");;
+            }
+        }
     }
 
 

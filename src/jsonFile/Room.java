@@ -35,8 +35,15 @@ public class Room {
         this.count = count;
     }
 
-    public static List<Room> fromChatRoomToRoom(ArrayList<ChatRoom> chatRooms) {
-        //TODO
-        return null;
+    public static ArrayList<Room> fromChatRoomToRoom(ArrayList<ChatRoom> chatRooms) {
+        ArrayList<Room> result = new ArrayList<>();
+        for(ChatRoom chatRoom:chatRooms){
+            result.add(new Room(chatRoom.getId(), chatRoom.getRoomUsers().size()));
+        }
+        return result;
+    }
+
+    public String toString(){
+        return this.roomId+": "+this.count;
     }
 }

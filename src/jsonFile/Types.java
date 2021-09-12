@@ -13,7 +13,10 @@ public enum Types {
     ROOMLIST("roomlist"),
     ROOMCHANGE("roomchange"),
     JOIN("join"),
-    ROOMCONTENTS("roomcontents"),;
+    ROOMCONTENTS("roomcontents"),
+    WHO("who"),
+    LIST("list"),
+    QUIT("quit");
 
     public String type;
     Types(String type) {

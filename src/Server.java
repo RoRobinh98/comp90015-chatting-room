@@ -2,6 +2,7 @@ import Identity.ChatRoom;
 import Identity.User;
 import com.google.gson.Gson;
 import jsonFile.General;
+import jsonFile.Room;
 import jsonFile.Types;
 
 import java.io.BufferedReader;
@@ -147,7 +148,16 @@ public class Server {
                     } else if (Types.ROOMCHANGE.type.equals(message.getType())) {
                         roomChange(message);
                     } else if(Types.JOIN.type.equals(message.getType())) {
-
+                        joinRoom(message);
+                    } else if(Types.WHO.type.equals(message.getType())) {
+                        replyForWho(message);
+                    } else if(Types.LIST.type.equals(message.getType())) {
+                        General roomList = new General(Types.ROOMLIST.type);
+                        roomList.setRooms(Room.fromChatRoomToRoom(chatRooms));
+                        sendMessage(gson.toJson(roomList));
+                    } else if(Types.QUIT.type.equals(message.getType())){
+                        replyForQuit();
+                        connection_alive = false;
                     }
 
                     else if(Types.MESSAGE.type.equals(message.getType())){
@@ -322,13 +332,44 @@ public class Server {
                 broadCast(gson.toJson(successfulChange), chatRooms, targetRoomId);
                 this.user.setRoomid(targetRoomId);
                 if (targetRoomId.equals(MAINHALL)) {
-                    //TODO mainhall
                     General mainHallContent = new General(Types.ROOMCONTENTS.type);
                     mainHallContent.setRoomid(MAINHALL);
                     mainHallContent.setIdentities(getRoomUserIds(ChatRoom.selectById(chatRooms, MAINHALL)));
                     mainHallContent.setOwner(ChatRoom.selectById(chatRooms, MAINHALL).getOwner());
                     General roomList = new General(Types.ROOMLIST.type);
+                    roomList.setRooms(Room.fromChatRoomToRoom(chatRooms));
+                    sendMessage(gson.toJson(mainHallContent));
+                    sendMessage(gson.toJson(roomList));
+                }
+            }
+        }
 
+        public void replyForWho(General inputLine){
+            String targetRoomId = inputLine.getRoomid();
+            General reply = new General(Types.ROOMCONTENTS.type);
+            if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)){
+                reply.setRoomid("");
+                sendMessage(gson.toJson(reply));
+                return;
+            }
+            ArrayList<String> userIds = new ArrayList<>();
+            ChatRoom chatRoom = ChatRoom.selectById(chatRooms, targetRoomId);
+            userIds.addAll(chatRoom.getRoomUsers().stream().map(User::getIdentity).collect(Collectors.toList())) ;
+            reply.setRoomid(targetRoomId);
+            reply.setIdentities(userIds);
+            reply.setOwner(chatRoom.getOwner());
+            sendMessage(gson.toJson(reply));
+        }
+
+        public void replyForQuit(){
+            General quitEntity = new General(Types.ROOMCHANGE.type);
+            quitEntity.setIdentity(this.user.getIdentity());
+            quitEntity.setFormer(this.user.getRoomid());
+            quitEntity.setRoomid("");
+            broadCast(gson.toJson(quitEntity),chatRooms,this.user.getRoomid());
+            for(ChatRoom chatRoom:chatRooms){
+                if(chatRoom.getOwner().equals(this.user.getIdentity())){
+                    chatRoom.setOwner("");
                 }
             }
         }
