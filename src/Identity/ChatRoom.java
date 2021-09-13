@@ -9,7 +9,7 @@ import java.util.ArrayList;
  */
 public class ChatRoom {
     private String id;
-    private ArrayList<User> roomUsers;
+    private ArrayList<User> roomUsers = new ArrayList<>();
     private String owner;
 
     public ChatRoom(String id) {

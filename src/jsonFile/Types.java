@@ -10,6 +10,7 @@ public enum Types {
     NEWIDENTITY("newidentity"),
     IDENTITYCHANGE("identitychange"),
     CREATEROOM("createroom"),
+    DELETEROOM("deleteroom"),
     ROOMLIST("roomlist"),
     ROOMCHANGE("roomchange"),
     JOIN("join"),
