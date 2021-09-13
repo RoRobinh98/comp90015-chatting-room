@@ -98,6 +98,7 @@ public class Client {
                     }
                     else if(fromServer.getType().equals(Types.MESSAGE.type)) {
                         System.out.printf("%s: %s",fromServer.getIdentity(), fromServer.getContent());
+                        System.out.println();
                     }
                     else if(fromServer.getType().equals(Types.ROOMCHANGE.type)){
                         if(fromServer.getFormer().equals(fromServer.getRoomid())){
@@ -153,7 +154,7 @@ public class Client {
                                 case "identitychange":
                                     messageSent = identityChange(input1[1]);
                                     break;
-                                case "creatroom":
+                                case "createroom":
                                     messageSent = createRoom(input1[1]);
                                     break;
                                 case "roomchange":
@@ -171,6 +172,8 @@ public class Client {
                                 case "quit":
                                     messageSent = askQuit();
                                     break;
+                                default:
+                                    System.out.println("Invalid Command");
                             }
                         }
 
