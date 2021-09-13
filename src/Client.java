@@ -129,7 +129,12 @@ public class Client {
                        }
                     }
                     else if(fromServer.getType().equals(Types.ROOMLIST.type)){
-                        listAllRooms(fromServer.getRooms());
+                        if(null == fromServer.getContent()) {
+                            listAllRooms(fromServer.getRooms());
+                        }else{
+                            System.out.println(fromServer.getContent());
+                            listAllRooms(fromServer.getRooms());
+                        }
                     }
 
                 }
