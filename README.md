@@ -9,3 +9,4 @@ Unsolved Issue:
 Checked and Passed Function on single client:
 1. IdentityChange
 2. createRoom
+3. roomList - #list
