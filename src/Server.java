@@ -36,6 +36,7 @@ public class Server {
         users = new ArrayList<>();
         chatRooms = new ArrayList<>();
         chatRooms.add(new ChatRoom(MAINHALL));
+        ChatRoom.selectById(chatRooms,MAINHALL).setOwner("");
         connectionList = new ArrayList<>();
     }
 
@@ -212,10 +213,10 @@ public class Server {
                 sendMessage(gson.toJson(message));
                 message.setContent(tempName + " is now " + newIdentity);
                 broadCast(gson.toJson(message), this);
-            }
-            for(ChatRoom room : chatRooms){
-                if(room.getOwner().equals(tempName)){
-                    room.setOwner(newIdentity);
+                for(ChatRoom room : chatRooms){
+                    if(room.getOwner().equals(tempName)){
+                        room.setOwner(newIdentity);
+                    }
                 }
             }
         }

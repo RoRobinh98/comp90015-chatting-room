@@ -88,10 +88,13 @@ public class Client {
 
                     }
                     //identify changed and output message
-                    else if(fromServer.getType().equals(Types.NEWIDENTITY.type) && !fromServer.getIdentity().equals(this.identity)){
-                        this.identity = fromServer.getIdentity();
-                        System.out.println(fromServer.getContent());
-
+                    else if(fromServer.getType().equals(Types.NEWIDENTITY.type)){
+                        if(fromServer.getIdentity().equals(fromServer.getFormer())){
+                            System.out.println("Requested identity invalid or in use");
+                        }else{
+                            System.out.println(fromServer.getFormer() + " is now " + fromServer.getIdentity());
+                            this.identity = fromServer.getIdentity();
+                        }
                     }
                     else if(fromServer.getType().equals(Types.MESSAGE.type)) {
                         System.out.printf("%s: %s",fromServer.getIdentity(), fromServer.getContent());
