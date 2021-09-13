@@ -93,8 +93,9 @@ public class Client {
                         System.out.println(fromServer.getContent());
 
                     }
-                    else if(fromServer.getType().equals(Types.MESSAGE.type))
-                        System.out.println(fromServer.getContent());
+                    else if(fromServer.getType().equals(Types.MESSAGE.type)) {
+                        System.out.printf("%s: %s",fromServer.getIdentity(), fromServer.getContent());
+                    }
                     else if(fromServer.getType().equals(Types.ROOMCHANGE.type)){
                         if(fromServer.getFormer().equals(fromServer.getRoomid())){
                             System.out.println("The requested room is invalid or non existent");
@@ -163,8 +164,10 @@ public class Client {
                                     break;
                                 case "list":
                                     messageSent = askList();
+                                    break;
                                 case "quit":
                                     messageSent = askQuit();
+                                    break;
                             }
                         }
 

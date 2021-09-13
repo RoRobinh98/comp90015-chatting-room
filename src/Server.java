@@ -378,7 +378,7 @@ public class Server {
             }
             ChatRoom currentRoom = ChatRoom.selectById(chatRooms,this.user.getRoomid());
             currentRoom.removeRoomUser(this.user);
-            if(currentRoom.getRoomUsers().size() == 0 && currentRoom.getOwner().equals("")){
+            if(currentRoom.getRoomUsers().size() == 0 && currentRoom.getOwner().equals("") && !currentRoom.getId().equals(MAINHALL)){
                 chatRooms.remove(currentRoom);
             }
         }
