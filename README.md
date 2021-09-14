@@ -8,7 +8,10 @@ Unsolved Issue:
 5. room内的广播还没正确实现
 
 Checked and Passed Function on single client:
-1. IdentityChange
-2. createRoom
-3. roomList - #list
-4. join
+1. IdentityChange (p9-11)
+2. join - (12-14)
+3. roomContents - #who (p15-16)
+4. roomList - #list (p17-18)
+5. createRoom (p19)
+6. 
+7. 
