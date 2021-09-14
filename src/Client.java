@@ -79,7 +79,6 @@ public class Client {
                     connection_alive = false;
                 } else {
                         General fromServer = gson.fromJson(inputLine, General.class);
-                        System.out.println(fromServer.getType());
                         if (fromServer.getType().equals(Types.NEWIDENTITY.type) && fromServer.getFormer().equals("")) {
                             this.identity = fromServer.getIdentity();
                             this.currentRoomId = "MainHail";
