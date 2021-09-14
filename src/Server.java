@@ -309,7 +309,6 @@ public class Server {
 
         public void joinRoom(General inputLine) {
             String targetRoomId = inputLine.getRoomid();
-            System.out.println("begin join");
             if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)) {
                 General failToChange = new General(Types.ROOMCHANGE.type);
                 failToChange.setIdentity(this.user.getIdentity());
@@ -318,7 +317,6 @@ public class Server {
                 sendMessage(gson.toJson(failToChange));
             }
             else {
-                System.out.println("find room");
                 General successfulChange = new General(Types.ROOMCHANGE.type);
                 successfulChange.setIdentity(this.user.getIdentity());
                 successfulChange.setFormer(this.user.getRoomid());
@@ -327,8 +325,6 @@ public class Server {
                 broadCast(gson.toJson(successfulChange), chatRooms, targetRoomId);
                 ChatRoom.selectById(chatRooms,this.user.getRoomid()).removeRoomUser(this.user);
                 ChatRoom.selectById(chatRooms,targetRoomId).addRoomUser(this.user);
-                System.out.println(ChatRoom.selectById(chatRooms,this.user.getRoomid()).getId()+ChatRoom.selectById(chatRooms,this.user.getRoomid()).getRoomUsers().size());
-                System.out.println(ChatRoom.selectById(chatRooms,targetRoomId).getId()+ChatRoom.selectById(chatRooms,targetRoomId).getRoomUsers().size());
                 this.user.setRoomid(targetRoomId);
 
                 if (targetRoomId.equals(MAINHALL)) {
