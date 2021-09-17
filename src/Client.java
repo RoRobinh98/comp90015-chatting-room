@@ -68,10 +68,6 @@ public class Client {
         private Gson gson = new Gson();
         private String identity;
         private String currentRoomId;
-//        private int askForCreate = 2;
-//        private  String createRoomName;
-//        private ArrayList<Room> roomList;
-//        private String tempOwner;
 
         public ChatClient(Socket socket) throws IOException {
             this.socket = socket;
@@ -92,13 +88,12 @@ public class Client {
             }
         }
 
-        public void run() throws IOException {
+        public void run() {
             connection_alive = true;
 
                 new Thread(new InputMsg()).start();
                 new Thread(new OutputMsg()).start();
 
-            //close();
         }
 
         public synchronized void identityChange(String input){
@@ -126,8 +121,7 @@ public class Client {
             return;
         }
 
-        public synchronized void createRoom(String input) throws IOException {
-            System.out.println("createroom");
+        public synchronized void createRoom(String input){
             if (input.length() >= 3 && input.length() <= 32) {
                 if( input.substring(0,1).matches("[A-Za-z]") && input.matches("^[A-Za-z0-9]+$")){
                     General command = new General(Types.CREATEROOM.type);
@@ -136,6 +130,7 @@ public class Client {
                     writer.print(input);
                     writer.println();
                     writer.flush();
+
                     return;
                 }
                 else{
@@ -231,15 +226,17 @@ public class Client {
                                 System.out.println();
 
                             }
-                            //identify changed and output message
                             else if (fromServer.getType().equals(Types.NEWIDENTITY.type)) {
                                 if (fromServer.getIdentity().equals(fromServer.getFormer())) {
                                     System.out.println("Requested identity invalid or in use");
                                 } else {
                                     System.out.println(fromServer.getFormer() + " is now " + fromServer.getIdentity());
-                                    identity = fromServer.getIdentity();
+                                    if(identity.equals(fromServer.getFormer())){
+                                        identity = fromServer.getIdentity();
+                                    }
                                 }
                             } else if (fromServer.getType().equals(Types.MESSAGE.type)) {
+                                System.out.println();
                                 System.out.printf("%s: %s", fromServer.getIdentity(), fromServer.getContent());
                                 System.out.println();
                             } else if (fromServer.getType().equals(Types.ROOMCHANGE.type)) {
@@ -258,14 +255,10 @@ public class Client {
                                         currentRoomId = fromServer.getRoomid();
                                 }
                             } else if (fromServer.getType().equals(Types.ROOMCONTENTS.type)) {
-                                System.out.println("in roomcontents");
                                 System.out.println("Owner: " + fromServer.getOwner());
                                 if (fromServer.getRoomid().equals("")) {
                                     System.out.println("The requested room is invalid or non existent");
                                 }
-//                            else if(askForCreate == 1){
-//                                tempOwner = fromServer.getOwner();
-//                            }
                                 else {
                                     if (fromServer.getIdentities().size() == 0)
                                         System.out.println(fromServer.getRoomid() + " has no one in the room currently");
@@ -273,47 +266,10 @@ public class Client {
                                         System.out.println(fromServer.getRoomid() + " contains " + allUserIds(fromServer.getIdentities(), fromServer.getOwner()));
                                 }
                             } else if (fromServer.getType().equals(Types.ROOMLIST.type)) {
-//                            System.out.println("room list");
-//                            if (askForCreate == 2) {
-//                                askForCreate--;
-//                                roomList = fromServer.getRooms();
-//                                for(Room room : roomList){
-//                                    if(room.getRoomId().equals(createRoomName)){
-//                                        System.out.println("Room " + createRoomName + " is invalid or already in use");
-//                                        askForCreate = 2;
-//                                        listAllRooms(fromServer.getRooms());
-//                                        return;
-//                                    }
-//                                }
-//                            } else if(askForCreate == 1) {
-//                                ArrayList<Room> roomNewList = fromServer.getRooms();
-//                                askWho(createRoomName);
-//                                for(Room room : roomNewList){
-//                                    if(room.getRoomId().equals(createRoomName)){
-//                                        System.out.println("before ask WHO");
-//                                        askWho(createRoomName);
-//                                        System.out.println("before tempOwner");
-//                                        System.out.println(inputLine);
-////                                        System.out.println("after ");
-//                                        if(tempOwner.equals(this.identity)){
-//                                            System.out.println("Room " + createRoomName + " created");
-//                                            askForCreate = 2;
-//                                            listAllRooms(fromServer.getRooms());
-//                                        }else{
-//                                            System.out.println("Room " + createRoomName + " is invalid or already in use");
-//                                            askForCreate = 2;
-//                                            listAllRooms(fromServer.getRooms());
-//                                        }
-//                                    }
-//                                }
-//                            }
-//                            else {
-////                                System.out.println(fromServer.getContent());
-//                                listAllRooms(fromServer.getRooms());
-//                            }
                                 if (null != fromServer.getContent()) {
                                     System.out.println(fromServer.getContent());
                                     listAllRooms(fromServer.getRooms());
+
                                 } else {
                                     listAllRooms(fromServer.getRooms());
                                 }
@@ -346,21 +302,13 @@ public class Client {
                         writer.println();
                         writer.flush();
                     } else {
-                        //TODO 不是发言，视为命令
                         if ("#".equals(input.substring(0, 1))) {
                             switch (input1[0].substring(1)) {
                                 case "identitychange":
                                     identityChange(input1[1]);
                                     break;
                                 case "createroom":
-//                                    System.out.println("createroom case");
-//                                    createRoomName = input1[1];
-//                                    askList();
-                                    try {
-                                        createRoom(input1[1]);
-                                    } catch (IOException e) {
-                                        e.printStackTrace();
-                                    }
+                                    createRoom(input1[1]);
                                     break;
                                 case "delete":
                                     deleteRoom(input1[1]);
@@ -386,10 +334,4 @@ public class Client {
             }
         }
     }
-
-
-
-
-
-
 }

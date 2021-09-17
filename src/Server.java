@@ -88,11 +88,9 @@ public class Server {
 
     private void enter(Server.ChatConnection connection) {
         connectionList.add(connection);
-        System.out.println(connectionList.size());
     }
 
     private void leave(Server.ChatConnection connection) {
-        broadCast(String.format("%d has left the chat", connection.socket.getPort()), connection);
         connectionList.remove(connection);
         users.remove(connection.user);
     }
@@ -185,11 +183,7 @@ public class Server {
                         createRoom(message);
                     } else if (Types.DELETE.type.equals(message.getType())){
                         deleteRoom(message);
-                    }
-//                    else if (Types.ROOMCHANGE.type.equals(message.getType())) {
-//                        roomChange(message);
-//                    }
-                    else if(Types.JOIN.type.equals(message.getType())) {
+                    } else if(Types.JOIN.type.equals(message.getType())) {
                         joinRoom(message);
                     } else if(Types.WHO.type.equals(message.getType())) {
                         replyForWho(message);
@@ -201,9 +195,7 @@ public class Server {
                         checkEmptyRoom();
                         replyForQuit();
                         connection_alive = false;
-                    }
-
-                    else if(Types.MESSAGE.type.equals(message.getType())){
+                    } else if(Types.MESSAGE.type.equals(message.getType())){
                         broadcastMessage(message);
                     }
                 } catch (IOException e) {
@@ -237,8 +229,10 @@ public class Server {
             General message = new General(Types.NEWIDENTITY.type);
             String tempName = inputLine.getFormer();
             String newIdentity = inputLine.getIdentity();
-            if(users.contains(newIdentity)){
-                flag = false;
+            for(User user:users){
+                if(user.getIdentity().equals(newIdentity)){
+                    flag = false;
+                }
             }
             if (!flag) {
                 message.setFormer(tempName);
@@ -261,7 +255,6 @@ public class Server {
         }
 
         public synchronized void createRoom(General inputLine){
-            System.out.println("got message");
             String roomName = inputLine.getRoomid();
             General message = new General(Types.ROOMLIST.type);
             for (ChatRoom room : chatRooms) {
@@ -274,80 +267,48 @@ public class Server {
             }
             chatRooms.add(new ChatRoom(roomName,this.user.getIdentity()));
             ChatRoom.selectById(chatRooms,roomName).setOwner(this.user.getIdentity());
-//            General joinMsg = new General(Types.JOIN.type);
-//            joinMsg.setRoomid(roomName);
-//            joinRoom(joinMsg);
-
             message.setContent("Room " + roomName + " created");
             message.setRooms(Room.fromChatRoomToRoom(chatRooms));
-            System.out.println("before send message" + gson.toJson(message));
             sendMessage(gson.toJson(message));
         }
 
         public synchronized void deleteRoom(General inputLine){
-            System.out.println("in the deleteroom");
+            String userName = this.user.getIdentity();
             String roomID = inputLine.getRoomid();
             ChatRoom room = ChatRoom.selectById(chatRooms,roomID);
-            for(User user: room.getRoomUsers()){
-                System.out.println("进入for循环");
-                System.out.println(user.toString());
-                roomChange(user.getIdentity(),roomID);
-                user.setRoomid(roomID);
+
+            if(!room.getOwner().equals(userName)){
+                General failToDelete = new General(Types.MESSAGE.type);
+                failToDelete.setContent("The requested room is invalid or non existent");
+                sendMessage(gson.toJson(failToDelete));
+                return;
             }
-            System.out.println("for循环之后");
+
+
+            for(User subUser: room.getRoomUsers()){
+                String targetRoomId = MAINHALL;
+                if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)) {
+                    General failToChange = new General(Types.ROOMCHANGE.type);
+                    failToChange.setIdentity(subUser.getIdentity());
+                    failToChange.setFormer(subUser.getRoomid());
+                    failToChange.setRoomid(subUser.getRoomid());
+                    sendMessage(gson.toJson(failToChange));
+                }
+                else {
+                    General successfulChange = new General(Types.ROOMCHANGE.type);
+                    successfulChange.setIdentity(subUser.getIdentity());
+                    successfulChange.setFormer(subUser.getRoomid());
+                    successfulChange.setRoomid(targetRoomId);
+                    getByUser(connectionList,subUser).sendMessage(gson.toJson(successfulChange));
+                    ChatRoom.selectById(chatRooms,targetRoomId).addRoomUser(subUser);
+                    subUser.setRoomid(targetRoomId);
+                }
+            }
             chatRooms.remove(room);
-
+            General roomList = new General(Types.ROOMLIST.type);
+            roomList.setRooms(Room.fromChatRoomToRoom(chatRooms));
+            sendMessage(gson.toJson(roomList));
         }
-
-        public synchronized void roomChange(String userName, String roomName){
-            System.out.println("in the roomChange");
-            System.out.println("userName:"+userName+"roomName"+roomName);
-            General message = new General(Types.ROOMCHANGE.type);
-            Server.ChatConnection client = connectionList.get(users.indexOf(userName));
-            message.setIdentity(userName);
-            message.setFormer(roomName);
-            message.setRoomid(MAINHALL);
-            ChatRoom.selectById(chatRooms,roomName).removeRoomUser(client.user);
-            ChatRoom.selectById(chatRooms,MAINHALL).addRoomUser(client.user);
-            client.sendMessage(gson.toJson(message));
-
-        }
-
-//        public synchronized void roomChange(General inputLine) {
-//            Boolean flag = false;
-//            General message = new General(Types.ROOMCHANGE.type);
-//            Server.ChatConnection client = null;
-//            String roomName = inputLine.getRoomid();
-//            for (Server.ChatConnection connection : connectionList) {
-//                if (connection.socket.getPort() == (socket.getPort())) {
-//                    client = connection;
-//                }
-//                for (ChatRoom room : chatRooms) {
-//                    if (room.equals(roomName)) {
-//                        flag = true;
-//                    }
-//                }
-//                if (!flag) {
-//                    message.setIdentity(client.user.getIdentity());
-//                    message.setContent("The requested room is invalid or non existent");
-//                    client.sendMessage(gson.toJson(message));
-//                } else {
-//                    message.setIdentity(client.user.getIdentity());
-//                    if (client.user.getRoomid().equals("")) {
-//                        message.setFormer(MAINHALL);
-//                        message.setContent(client.user.getIdentity() + " moved from MainHall to " + roomName);
-//                    } else {
-//                        message.setFormer(client.user.getRoomid());
-//                        message.setContent(client.user.getIdentity() + " moved from + " + client.user.getRoomid() + " to " + roomName);
-//                    }
-//                    message.setRoomid(roomName);
-//
-//                    ChatRoom.selectById(chatRooms, roomName).addRoomUser(client.user);
-//                ChatRoom.selectById(chatRooms,MAINHALL);
-//                    broadCast(gson.toJson(message), chatRooms, roomName);
-//                }
-//            }
-//        }
 
         public synchronized void broadcastMessage(General inputLine) {
             General message = new General(Types.MESSAGE.type);
