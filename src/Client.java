@@ -8,6 +8,9 @@ import com.google.gson.Gson;
 import jsonFile.General;
 import jsonFile.Room;
 import jsonFile.Types;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
 
 import java.io.*;
 import java.net.Socket;
@@ -16,23 +19,39 @@ import java.util.ArrayList;
 import java.util.Scanner;
 
 public class Client {
-    public static void main(String[] args) {
-       new Client().handle();
+    public static void main(String[] args){
+
+        CmdCommand cmdCommand = new CmdCommand();
+        CmdLineParser parser = new CmdLineParser(cmdCommand);
+        try {
+            parser.parseArgument(args);
+
+            new Client().handle(cmdCommand.hostName, cmdCommand.portNum);
+
+        } catch (CmdLineException e) {
+            System.out.println("command line error");
+            e.printStackTrace();
+        }
     }
 
-    public void handle(){
+    public static class CmdCommand {
+        @Option(name = "-p", usage = "client port number")
+        public int portNum = 4444;
+
+        @Option(name = "-h", usage = "client hostname")
+        public String hostName = "localhost";
+    }
+
+    public void handle(String hostName, int portNum){
         Socket socket;
         try {
-            socket=new Socket("127.0.0.1", 6379);
-            boolean handler_alive = true;
-            while (handler_alive) {
-                ChatClient conn = new ChatClient(socket);
-                if (conn != null) {
-                    conn.run();
-                } else {
-                    handler_alive = false;
-                }
+            socket=new Socket(hostName, portNum);
+            ChatClient conn = new ChatClient(socket);
+            if (conn != null) {
+                conn.run();
             }
+            else
+                System.out.println("Connection failed");
 
         } catch (UnknownHostException e) {
             e.printStackTrace();
@@ -75,117 +94,11 @@ public class Client {
 
         public void run() throws IOException {
             connection_alive = true;
-            while (connection_alive == true){
 
-                String inputLine = reader.readLine();
-                System.out.println(inputLine);
-                if (inputLine == null) {
-                    // bad write, close
-                    connection_alive = false;
-                } else {
-                        General fromServer = gson.fromJson(inputLine, General.class);
-                        if (fromServer.getType().equals(Types.NEWIDENTITY.type) && fromServer.getFormer().equals("")) {
-                            this.identity = fromServer.getIdentity();
-                            this.currentRoomId = "MainHail";
-                            System.out.printf("Connected to %s as %s", socket.getLocalAddress().getCanonicalHostName(), this.identity);
-                            System.out.println();
+                new Thread(new InputMsg()).start();
+                new Thread(new OutputMsg()).start();
 
-                        }
-                        //identify changed and output message
-                        else if (fromServer.getType().equals(Types.NEWIDENTITY.type)) {
-                            if (fromServer.getIdentity().equals(fromServer.getFormer())) {
-                                System.out.println("Requested identity invalid or in use");
-                            } else {
-                                System.out.println(fromServer.getFormer() + " is now " + fromServer.getIdentity());
-                                this.identity = fromServer.getIdentity();
-                            }
-                        } else if (fromServer.getType().equals(Types.MESSAGE.type)) {
-                            System.out.printf("%s: %s", fromServer.getIdentity(), fromServer.getContent());
-                            System.out.println();
-                        } else if (fromServer.getType().equals(Types.ROOMCHANGE.type)) {
-                            if (fromServer.getFormer().equals(fromServer.getRoomid())) {
-                                System.out.println("The requested room is invalid or non existent");
-                            } else if (fromServer.getRoomid().equals("")) {
-                                System.out.printf("%s leaves %s", fromServer.getIdentity(), fromServer.getFormer());
-                                System.out.println();
-                                if (fromServer.getIdentity().equals(this.identity)) {
-                                    connection_alive = false;
-                                }
-                            } else {
-                                System.out.printf("%s moved from %s to %s", fromServer.getIdentity(), fromServer.getFormer(), fromServer.getRoomid());
-                                if (fromServer.getIdentity().equals(this.identity))
-                                    this.currentRoomId = fromServer.getRoomid();
-                            }
-                        } else if (fromServer.getType().equals(Types.ROOMCONTENTS.type)) {
-                            System.out.println("in roomcontents");
-                            System.out.println("Owner: " + fromServer.getOwner());
-                            if (fromServer.getRoomid().equals("")) {
-                                System.out.println("The requested room is invalid or non existent");
-                            }
-//                            else if(askForCreate == 1){
-//                                tempOwner = fromServer.getOwner();
-//                            }
-                            else {
-                                if (fromServer.getIdentities().size() == 0)
-                                    System.out.println(fromServer.getRoomid() + " has no one in the room currently");
-                                else
-                                    System.out.println(fromServer.getRoomid() + " contains " + allUserIds(fromServer.getIdentities(), fromServer.getOwner()));
-                            }
-                        } else if (fromServer.getType().equals(Types.ROOMLIST.type)) {
-//                            System.out.println("room list");
-//                            if (askForCreate == 2) {
-//                                askForCreate--;
-//                                roomList = fromServer.getRooms();
-//                                for(Room room : roomList){
-//                                    if(room.getRoomId().equals(createRoomName)){
-//                                        System.out.println("Room " + createRoomName + " is invalid or already in use");
-//                                        askForCreate = 2;
-//                                        listAllRooms(fromServer.getRooms());
-//                                        return;
-//                                    }
-//                                }
-//                            } else if(askForCreate == 1) {
-//                                ArrayList<Room> roomNewList = fromServer.getRooms();
-//                                askWho(createRoomName);
-//                                for(Room room : roomNewList){
-//                                    if(room.getRoomId().equals(createRoomName)){
-//                                        System.out.println("before ask WHO");
-//                                        askWho(createRoomName);
-//                                        System.out.println("before tempOwner");
-//                                        System.out.println(inputLine);
-////                                        System.out.println("after ");
-//                                        if(tempOwner.equals(this.identity)){
-//                                            System.out.println("Room " + createRoomName + " created");
-//                                            askForCreate = 2;
-//                                            listAllRooms(fromServer.getRooms());
-//                                        }else{
-//                                            System.out.println("Room " + createRoomName + " is invalid or already in use");
-//                                            askForCreate = 2;
-//                                            listAllRooms(fromServer.getRooms());
-//                                        }
-//                                    }
-//                                }
-//                            }
-//                            else {
-////                                System.out.println(fromServer.getContent());
-//                                listAllRooms(fromServer.getRooms());
-//                            }
-                            if(null != fromServer.getContent()){
-                                System.out.println(fromServer.getContent());
-                                listAllRooms(fromServer.getRooms());
-                            }
-                            else{
-                                listAllRooms(fromServer.getRooms());
-                            }
-                        }
-
-                        Runnable outputMsg = new OutputMsg();
-                        Thread thread = new Thread(outputMsg);
-                        thread.start();
-                }
-            }
-            
-            close();
+            //close();
         }
 
         public synchronized void identityChange(String input){
@@ -203,10 +116,12 @@ public class Client {
                 else{
                     System.out.println("Starting with an upper or lower case character");
                     System.out.println("And upper and lower case characters only and digits");
+                    System.out.printf("[%s] %s>", currentRoomId, identity);
                 }
             } else {
                 System.out.println("The identity must be at least 3 characters " +
                         "and no more than 16 characters");
+                System.out.printf("[%s] %s>", currentRoomId, identity);
             }
             return;
         }
@@ -226,11 +141,13 @@ public class Client {
                 else{
                     System.out.println("Starting with an upper or lower case character");
                     System.out.println("And upper and lower case characters only and digits");
+                    System.out.printf("[%s] %s>", currentRoomId, identity);
                 }
             }
             else {
                 System.out.println("The room name must be at least 3 characters " +
                         "and no more than 32 characters");
+                System.out.printf("[%s] %s>", currentRoomId, identity);
             }
             return;
         }
@@ -294,10 +211,130 @@ public class Client {
             }
         }
 
-        private class OutputMsg implements Runnable{
+        private class InputMsg implements Runnable{
+
+            @Override
             public void run() {
                 while (connection_alive == true) {
-                    System.out.printf("[%s] %s>", currentRoomId, identity);
+                    try {
+                        String inputLine = reader.readLine();
+                        if (inputLine == null){
+                            System.out.println("Connection failed");
+                            connection_alive = false;
+                        }
+                        else {
+                            General fromServer = gson.fromJson(inputLine, General.class);
+                            if (fromServer.getType().equals(Types.NEWIDENTITY.type) && fromServer.getFormer().equals("")) {
+                                identity = fromServer.getIdentity();
+                                currentRoomId = "MainHail";
+                                System.out.printf("Connected to %s as %s", socket.getLocalAddress().getCanonicalHostName(), identity);
+                                System.out.println();
+
+                            }
+                            //identify changed and output message
+                            else if (fromServer.getType().equals(Types.NEWIDENTITY.type)) {
+                                if (fromServer.getIdentity().equals(fromServer.getFormer())) {
+                                    System.out.println("Requested identity invalid or in use");
+                                } else {
+                                    System.out.println(fromServer.getFormer() + " is now " + fromServer.getIdentity());
+                                    identity = fromServer.getIdentity();
+                                }
+                            } else if (fromServer.getType().equals(Types.MESSAGE.type)) {
+                                System.out.printf("%s: %s", fromServer.getIdentity(), fromServer.getContent());
+                                System.out.println();
+                            } else if (fromServer.getType().equals(Types.ROOMCHANGE.type)) {
+                                if (fromServer.getFormer().equals(fromServer.getRoomid())) {
+                                    System.out.println("The requested room is invalid or non existent");
+                                } else if (fromServer.getRoomid().equals("")) {
+                                    System.out.printf("%s leaves %s", fromServer.getIdentity(), fromServer.getFormer());
+                                    System.out.println();
+                                    if (fromServer.getIdentity().equals(identity)) {
+                                        connection_alive = false;
+                                    }
+                                } else {
+                                    System.out.printf("%s moved from %s to %s", fromServer.getIdentity(), fromServer.getFormer(), fromServer.getRoomid());
+                                    System.out.println();
+                                    if (fromServer.getIdentity().equals(identity))
+                                        currentRoomId = fromServer.getRoomid();
+                                }
+                            } else if (fromServer.getType().equals(Types.ROOMCONTENTS.type)) {
+                                System.out.println("in roomcontents");
+                                System.out.println("Owner: " + fromServer.getOwner());
+                                if (fromServer.getRoomid().equals("")) {
+                                    System.out.println("The requested room is invalid or non existent");
+                                }
+//                            else if(askForCreate == 1){
+//                                tempOwner = fromServer.getOwner();
+//                            }
+                                else {
+                                    if (fromServer.getIdentities().size() == 0)
+                                        System.out.println(fromServer.getRoomid() + " has no one in the room currently");
+                                    else
+                                        System.out.println(fromServer.getRoomid() + " contains " + allUserIds(fromServer.getIdentities(), fromServer.getOwner()));
+                                }
+                            } else if (fromServer.getType().equals(Types.ROOMLIST.type)) {
+//                            System.out.println("room list");
+//                            if (askForCreate == 2) {
+//                                askForCreate--;
+//                                roomList = fromServer.getRooms();
+//                                for(Room room : roomList){
+//                                    if(room.getRoomId().equals(createRoomName)){
+//                                        System.out.println("Room " + createRoomName + " is invalid or already in use");
+//                                        askForCreate = 2;
+//                                        listAllRooms(fromServer.getRooms());
+//                                        return;
+//                                    }
+//                                }
+//                            } else if(askForCreate == 1) {
+//                                ArrayList<Room> roomNewList = fromServer.getRooms();
+//                                askWho(createRoomName);
+//                                for(Room room : roomNewList){
+//                                    if(room.getRoomId().equals(createRoomName)){
+//                                        System.out.println("before ask WHO");
+//                                        askWho(createRoomName);
+//                                        System.out.println("before tempOwner");
+//                                        System.out.println(inputLine);
+////                                        System.out.println("after ");
+//                                        if(tempOwner.equals(this.identity)){
+//                                            System.out.println("Room " + createRoomName + " created");
+//                                            askForCreate = 2;
+//                                            listAllRooms(fromServer.getRooms());
+//                                        }else{
+//                                            System.out.println("Room " + createRoomName + " is invalid or already in use");
+//                                            askForCreate = 2;
+//                                            listAllRooms(fromServer.getRooms());
+//                                        }
+//                                    }
+//                                }
+//                            }
+//                            else {
+////                                System.out.println(fromServer.getContent());
+//                                listAllRooms(fromServer.getRooms());
+//                            }
+                                if (null != fromServer.getContent()) {
+                                    System.out.println(fromServer.getContent());
+                                    listAllRooms(fromServer.getRooms());
+                                } else {
+                                    listAllRooms(fromServer.getRooms());
+                                }
+                            }
+
+                            System.out.printf("[%s] %s>", currentRoomId, identity);
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+
+                }
+
+                close();
+            }
+        }
+
+        private class OutputMsg implements Runnable{
+            public void run() {
+                while (connection_alive) {
                     Scanner scanner = new Scanner(System.in);
                     String input = scanner.nextLine();
                     String[] input1 = input.split(" ");

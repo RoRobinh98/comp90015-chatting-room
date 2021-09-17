@@ -4,6 +4,9 @@ import com.google.gson.Gson;
 import jsonFile.General;
 import jsonFile.Room;
 import jsonFile.Types;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -21,7 +24,6 @@ import java.util.stream.Collectors;
  * @apiNote
  */
 public class Server {
-    public static final int port = 6379;
     private static final String MAINHALL = "MainHall";
     private boolean handler_alive = false;
     private ArrayList<User> users;
@@ -29,7 +31,23 @@ public class Server {
     private volatile List<ChatConnection> connectionList;
 
     public static void main(String[] args) {
-        new Server().handle();
+        CmdCommand cmdCommand = new CmdCommand();
+        CmdLineParser parser = new CmdLineParser(cmdCommand);
+
+        try {
+            parser.parseArgument(args);
+
+            new Server().handle(cmdCommand.portNum);
+        } catch (CmdLineException e) {
+            System.out.println("command lien error");
+            e.printStackTrace();
+        }
+
+    }
+
+    public static class CmdCommand {
+        @Option(name = "-p", usage = "client port number")
+        public int portNum = 4444;
     }
 
     public Server() {
@@ -40,12 +58,12 @@ public class Server {
         connectionList = new ArrayList<>();
     }
 
-    public void handle() {
+    public void handle(int portNum) {
         ServerSocket serverSocket;
         try {
-            serverSocket = new ServerSocket(port);
+            serverSocket = new ServerSocket(portNum);
 
-            System.out.printf("Listening on port %d\n", port);
+            System.out.printf("Listening on port %d\n", portNum);
             handler_alive = true;
 
             while (handler_alive) {
@@ -69,7 +87,6 @@ public class Server {
     }
 
     private void enter(Server.ChatConnection connection) {
-        broadCast(String.format("%d has joined the chat", connection.socket.getPort()), null);
         connectionList.add(connection);
         System.out.println(connectionList.size());
     }
