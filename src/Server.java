@@ -71,6 +71,7 @@ public class Server {
     private void enter(Server.ChatConnection connection) {
         broadCast(String.format("%d has joined the chat", connection.socket.getPort()), null);
         connectionList.add(connection);
+        System.out.println(connectionList.size());
     }
 
     private void leave(Server.ChatConnection connection) {
@@ -90,7 +91,24 @@ public class Server {
     private synchronized void broadCast(String message, ArrayList<ChatRoom> chatRoom, String roomName) {
         ChatRoom room = ChatRoom.selectById(chatRoom, roomName);
         for (User user : room.getRoomUsers()) {
-            connectionList.get((users.indexOf(user))).sendMessage(message);
+            getByUser(connectionList,user).sendMessage(message);
+        }
+    }
+
+    private ChatConnection getByUser(List<ChatConnection> chatConnections,User user){
+        for(ChatConnection connection : chatConnections){
+            if(connection.user.equals(user)){
+                return connection;
+            }
+        }
+        return null;
+    }
+
+    private synchronized void checkEmptyRoom(){
+        for(ChatRoom chatRoom : chatRooms){
+            if(chatRoom.getOwner().equals("") && !chatRoom.getId().equals(MAINHALL) && chatRoom.getRoomUsers().size()==0){
+                chatRooms.remove(chatRoom);
+            }
         }
     }
 
@@ -148,11 +166,13 @@ public class Server {
                         identityChange(message);
                     } else if (Types.CREATEROOM.type.equals(message.getType())) {
                         createRoom(message);
-                    } else if (Types.DELETEROOM.type.equals(message.getType())){
+                    } else if (Types.DELETE.type.equals(message.getType())){
                         deleteRoom(message);
-                    } else if (Types.ROOMCHANGE.type.equals(message.getType())) {
-                        roomChange(message);
-                    } else if(Types.JOIN.type.equals(message.getType())) {
+                    }
+//                    else if (Types.ROOMCHANGE.type.equals(message.getType())) {
+//                        roomChange(message);
+//                    }
+                    else if(Types.JOIN.type.equals(message.getType())) {
                         joinRoom(message);
                     } else if(Types.WHO.type.equals(message.getType())) {
                         replyForWho(message);
@@ -161,6 +181,7 @@ public class Server {
                         roomList.setRooms(Room.fromChatRoomToRoom(chatRooms));
                         sendMessage(gson.toJson(roomList));
                     } else if(Types.QUIT.type.equals(message.getType())){
+                        checkEmptyRoom();
                         replyForQuit();
                         connection_alive = false;
                     }
@@ -175,7 +196,7 @@ public class Server {
             close();
         }
 
-        public void sendMessage(String message) {
+        public synchronized void sendMessage(String message) {
             writer.print(message);
             writer.println();
             writer.flush();
@@ -193,7 +214,7 @@ public class Server {
             return "guest" + i;
         }
 
-        public void identityChange(General inputLine){
+        public synchronized void identityChange(General inputLine){
 
             Boolean flag = true;
             General message = new General(Types.NEWIDENTITY.type);
@@ -222,37 +243,48 @@ public class Server {
             }
         }
 
-        public void createRoom(General inputLine){
+        public synchronized void createRoom(General inputLine){
+            System.out.println("got message");
             String roomName = inputLine.getRoomid();
+            General message = new General(Types.ROOMLIST.type);
             for (ChatRoom room : chatRooms) {
                 if (room.getId().equals(roomName)) {
-                    General message = new General(Types.MESSAGE.type);
                     message.setContent("Room " + roomName + " is invalid or already in use.");
+                    message.setRooms(Room.fromChatRoomToRoom(chatRooms));
                     sendMessage(gson.toJson(message));
                     return;
                 }
             }
             chatRooms.add(new ChatRoom(roomName,this.user.getIdentity()));
-            ChatRoom.selectById(chatRooms,roomName).setOwner("*"+this.user.getIdentity());
-            General joinMsg = new General(Types.JOIN.type);
-            joinMsg.setRoomid(roomName);
-            joinRoom(joinMsg);
-            General message = new General(Types.ROOMLIST.type);
+            ChatRoom.selectById(chatRooms,roomName).setOwner(this.user.getIdentity());
+//            General joinMsg = new General(Types.JOIN.type);
+//            joinMsg.setRoomid(roomName);
+//            joinRoom(joinMsg);
+
             message.setContent("Room " + roomName + " created");
             message.setRooms(Room.fromChatRoomToRoom(chatRooms));
+            System.out.println("before send message" + gson.toJson(message));
             sendMessage(gson.toJson(message));
         }
 
-        public void deleteRoom(General inputLine){
+        public synchronized void deleteRoom(General inputLine){
+            System.out.println("in the deleteroom");
             String roomID = inputLine.getRoomid();
             ChatRoom room = ChatRoom.selectById(chatRooms,roomID);
             for(User user: room.getRoomUsers()){
+                System.out.println("进入for循环");
+                System.out.println(user.toString());
                 roomChange(user.getIdentity(),roomID);
+                user.setRoomid(roomID);
             }
+            System.out.println("for循环之后");
             chatRooms.remove(room);
+
         }
 
-        public void roomChange(String userName, String roomName){
+        public synchronized void roomChange(String userName, String roomName){
+            System.out.println("in the roomChange");
+            System.out.println("userName:"+userName+"roomName"+roomName);
             General message = new General(Types.ROOMCHANGE.type);
             Server.ChatConnection client = connectionList.get(users.indexOf(userName));
             message.setIdentity(userName);
@@ -264,50 +296,50 @@ public class Server {
 
         }
 
-        public void roomChange(General inputLine) {
-            Boolean flag = false;
-            General message = new General(Types.ROOMCHANGE.type);
-            Server.ChatConnection client = null;
-            String roomName = inputLine.getRoomid();
-            for (Server.ChatConnection connection : connectionList) {
-                if (connection.socket.getPort() == (socket.getPort())) {
-                    client = connection;
-                }
-                for (ChatRoom room : chatRooms) {
-                    if (room.equals(roomName)) {
-                        flag = true;
-                    }
-                }
-                if (!flag) {
-                    message.setIdentity(client.user.getIdentity());
-                    message.setContent("The requested room is invalid or non existent");
-                    client.sendMessage(gson.toJson(message));
-                } else {
-                    message.setIdentity(client.user.getIdentity());
-                    if (client.user.getRoomid().equals("")) {
-                        message.setFormer(MAINHALL);
-                        message.setContent(client.user.getIdentity() + " moved from MainHall to " + roomName);
-                    } else {
-                        message.setFormer(client.user.getRoomid());
-                        message.setContent(client.user.getIdentity() + " moved from + " + client.user.getRoomid() + " to " + roomName);
-                    }
-                    message.setRoomid(roomName);
-
-                    ChatRoom.selectById(chatRooms, roomName).addRoomUser(client.user);
+//        public synchronized void roomChange(General inputLine) {
+//            Boolean flag = false;
+//            General message = new General(Types.ROOMCHANGE.type);
+//            Server.ChatConnection client = null;
+//            String roomName = inputLine.getRoomid();
+//            for (Server.ChatConnection connection : connectionList) {
+//                if (connection.socket.getPort() == (socket.getPort())) {
+//                    client = connection;
+//                }
+//                for (ChatRoom room : chatRooms) {
+//                    if (room.equals(roomName)) {
+//                        flag = true;
+//                    }
+//                }
+//                if (!flag) {
+//                    message.setIdentity(client.user.getIdentity());
+//                    message.setContent("The requested room is invalid or non existent");
+//                    client.sendMessage(gson.toJson(message));
+//                } else {
+//                    message.setIdentity(client.user.getIdentity());
+//                    if (client.user.getRoomid().equals("")) {
+//                        message.setFormer(MAINHALL);
+//                        message.setContent(client.user.getIdentity() + " moved from MainHall to " + roomName);
+//                    } else {
+//                        message.setFormer(client.user.getRoomid());
+//                        message.setContent(client.user.getIdentity() + " moved from + " + client.user.getRoomid() + " to " + roomName);
+//                    }
+//                    message.setRoomid(roomName);
+//
+//                    ChatRoom.selectById(chatRooms, roomName).addRoomUser(client.user);
 //                ChatRoom.selectById(chatRooms,MAINHALL);
-                    broadCast(gson.toJson(message), chatRooms, roomName);
-                }
-            }
-        }
+//                    broadCast(gson.toJson(message), chatRooms, roomName);
+//                }
+//            }
+//        }
 
-        public void broadcastMessage(General inputLine) {
+        public synchronized void broadcastMessage(General inputLine) {
             General message = new General(Types.MESSAGE.type);
             message.setIdentity(this.user.getIdentity());
             message.setContent(inputLine.getContent());
             broadCast(gson.toJson(message), chatRooms, this.user.getRoomid());
         }
 
-        public void joinRoom(General inputLine) {
+        public synchronized void joinRoom(General inputLine) {
             String targetRoomId = inputLine.getRoomid();
             if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)) {
                 General failToChange = new General(Types.ROOMCHANGE.type);
@@ -340,7 +372,7 @@ public class Server {
             }
         }
 
-        public void replyForWho(General inputLine){
+        public synchronized void replyForWho(General inputLine){
             String targetRoomId = inputLine.getRoomid();
             General reply = new General(Types.ROOMCONTENTS.type);
             if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)){
@@ -357,7 +389,7 @@ public class Server {
             sendMessage(gson.toJson(reply));
         }
 
-        public void replyForQuit(){
+        public synchronized void replyForQuit(){
             General quitEntity = new General(Types.ROOMCHANGE.type);
             quitEntity.setIdentity(this.user.getIdentity());
             quitEntity.setFormer(this.user.getRoomid());

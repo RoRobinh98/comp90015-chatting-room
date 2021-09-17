@@ -49,6 +49,10 @@ public class Client {
         private Gson gson = new Gson();
         private String identity;
         private String currentRoomId;
+//        private int askForCreate = 2;
+//        private  String createRoomName;
+//        private ArrayList<Room> roomList;
+//        private String tempOwner;
 
         public ChatClient(Socket socket) throws IOException {
             this.socket = socket;
@@ -74,6 +78,7 @@ public class Client {
             while (connection_alive == true){
 
                 String inputLine = reader.readLine();
+                System.out.println(inputLine);
                 if (inputLine == null) {
                     // bad write, close
                     connection_alive = false;
@@ -112,19 +117,64 @@ public class Client {
                                     this.currentRoomId = fromServer.getRoomid();
                             }
                         } else if (fromServer.getType().equals(Types.ROOMCONTENTS.type)) {
+                            System.out.println("in roomcontents");
+                            System.out.println("Owner: " + fromServer.getOwner());
                             if (fromServer.getRoomid().equals("")) {
                                 System.out.println("The requested room is invalid or non existent");
-                            } else {
+                            }
+//                            else if(askForCreate == 1){
+//                                tempOwner = fromServer.getOwner();
+//                            }
+                            else {
                                 if (fromServer.getIdentities().size() == 0)
                                     System.out.println(fromServer.getRoomid() + " has no one in the room currently");
                                 else
                                     System.out.println(fromServer.getRoomid() + " contains " + allUserIds(fromServer.getIdentities(), fromServer.getOwner()));
                             }
                         } else if (fromServer.getType().equals(Types.ROOMLIST.type)) {
-                            if (null == fromServer.getContent()) {
-                                listAllRooms(fromServer.getRooms());
-                            } else {
+//                            System.out.println("room list");
+//                            if (askForCreate == 2) {
+//                                askForCreate--;
+//                                roomList = fromServer.getRooms();
+//                                for(Room room : roomList){
+//                                    if(room.getRoomId().equals(createRoomName)){
+//                                        System.out.println("Room " + createRoomName + " is invalid or already in use");
+//                                        askForCreate = 2;
+//                                        listAllRooms(fromServer.getRooms());
+//                                        return;
+//                                    }
+//                                }
+//                            } else if(askForCreate == 1) {
+//                                ArrayList<Room> roomNewList = fromServer.getRooms();
+//                                askWho(createRoomName);
+//                                for(Room room : roomNewList){
+//                                    if(room.getRoomId().equals(createRoomName)){
+//                                        System.out.println("before ask WHO");
+//                                        askWho(createRoomName);
+//                                        System.out.println("before tempOwner");
+//                                        System.out.println(inputLine);
+////                                        System.out.println("after ");
+//                                        if(tempOwner.equals(this.identity)){
+//                                            System.out.println("Room " + createRoomName + " created");
+//                                            askForCreate = 2;
+//                                            listAllRooms(fromServer.getRooms());
+//                                        }else{
+//                                            System.out.println("Room " + createRoomName + " is invalid or already in use");
+//                                            askForCreate = 2;
+//                                            listAllRooms(fromServer.getRooms());
+//                                        }
+//                                    }
+//                                }
+//                            }
+//                            else {
+////                                System.out.println(fromServer.getContent());
+//                                listAllRooms(fromServer.getRooms());
+//                            }
+                            if(null != fromServer.getContent()){
                                 System.out.println(fromServer.getContent());
+                                listAllRooms(fromServer.getRooms());
+                            }
+                            else{
                                 listAllRooms(fromServer.getRooms());
                             }
                         }
@@ -132,24 +182,13 @@ public class Client {
                         Runnable outputMsg = new OutputMsg();
                         Thread thread = new Thread(outputMsg);
                         thread.start();
-
-
                 }
-
-
-
-
             }
             
             close();
         }
 
-        /**
-        * @Description: identityChange
-        * @Author: Yuanyi Zhang
-        * @Date: 2021/9/6
-        */
-        public void identityChange(String input){
+        public synchronized void identityChange(String input){
             if (input.length() >= 3 && input.length() <= 16) {
                 if( input.substring(0,1).matches("[A-Za-z]") && input.matches("^[A-Za-z0-9]+$")){
                     General command = new General(Types.IDENTITYCHANGE.type);
@@ -172,13 +211,8 @@ public class Client {
             return;
         }
 
-
-        /**
-         * @Description: roomChange
-         * @Author: Yuanyi Zhang
-         * @Date: 9/11/2021
-         */
-        public void createRoom(String input){
+        public synchronized void createRoom(String input) throws IOException {
+            System.out.println("createroom");
             if (input.length() >= 3 && input.length() <= 32) {
                 if( input.substring(0,1).matches("[A-Za-z]") && input.matches("^[A-Za-z0-9]+$")){
                     General command = new General(Types.CREATEROOM.type);
@@ -201,8 +235,8 @@ public class Client {
             return;
         }
 
-        public void roomChange(String input){
-            General command = new General(Types.JOIN.type);
+        public synchronized void deleteRoom(String input){
+            General command = new General(Types.DELETE.type);
             command.setRoomid(input);
             input = gson.toJson(command);
             writer.print(input);
@@ -210,7 +244,7 @@ public class Client {
             writer.flush();
         }
 
-        public void joinRoom(String input){
+        public synchronized void joinRoom(String input){
             General command = new General(Types.JOIN.type);
             command.setRoomid(input);
             writer.print(gson.toJson(command));
@@ -219,7 +253,7 @@ public class Client {
             return;
         }
 
-        public void askWho(String input){
+        public synchronized void askWho(String input){
             General command = new General(Types.WHO.type);
             command.setRoomid(input);
             writer.print(gson.toJson(command));
@@ -228,7 +262,7 @@ public class Client {
             return;
         }
 
-        public void askList(){
+        public synchronized void askList(){
             General command = new General(Types.LIST.type);
             writer.print(gson.toJson(command));
             writer.println();
@@ -282,11 +316,17 @@ public class Client {
                                     identityChange(input1[1]);
                                     break;
                                 case "createroom":
-                                    createRoom(input1[1]);
+//                                    System.out.println("createroom case");
+//                                    createRoomName = input1[1];
+//                                    askList();
+                                    try {
+                                        createRoom(input1[1]);
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                    }
                                     break;
-                                case "roomchange":
-                                    roomChange(input1[1]);
-                                    break;
+                                case "delete":
+                                    deleteRoom(input1[1]);
                                 case "join":
                                     joinRoom(input1[1]);
                                     break;
