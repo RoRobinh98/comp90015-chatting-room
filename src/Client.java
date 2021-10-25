@@ -236,7 +236,6 @@ public class Client {
                                     }
                                 }
                             } else if (fromServer.getType().equals(Types.MESSAGE.type)) {
-                                System.out.println();
                                 System.out.printf("%s: %s", fromServer.getIdentity(), fromServer.getContent());
                                 System.out.println();
                             } else if (fromServer.getType().equals(Types.ROOMCHANGE.type)) {
@@ -312,6 +311,7 @@ public class Client {
                                     break;
                                 case "delete":
                                     deleteRoom(input1[1]);
+                                    break;
                                 case "join":
                                     joinRoom(input1[1]);
                                     break;

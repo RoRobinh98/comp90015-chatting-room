@@ -287,14 +287,6 @@ public class Server {
 
             for(User subUser: room.getRoomUsers()){
                 String targetRoomId = MAINHALL;
-                if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)) {
-                    General failToChange = new General(Types.ROOMCHANGE.type);
-                    failToChange.setIdentity(subUser.getIdentity());
-                    failToChange.setFormer(subUser.getRoomid());
-                    failToChange.setRoomid(subUser.getRoomid());
-                    sendMessage(gson.toJson(failToChange));
-                }
-                else {
                     General successfulChange = new General(Types.ROOMCHANGE.type);
                     successfulChange.setIdentity(subUser.getIdentity());
                     successfulChange.setFormer(subUser.getRoomid());
@@ -302,7 +294,6 @@ public class Server {
                     getByUser(connectionList,subUser).sendMessage(gson.toJson(successfulChange));
                     ChatRoom.selectById(chatRooms,targetRoomId).addRoomUser(subUser);
                     subUser.setRoomid(targetRoomId);
-                }
             }
             chatRooms.remove(room);
             General roomList = new General(Types.ROOMLIST.type);
