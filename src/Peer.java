@@ -1,6 +1,8 @@
 import Identity.ChatRoom;
 import Identity.User;
 import com.google.gson.Gson;
+import jsonFile.General;
+import jsonFile.Types;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -22,11 +24,9 @@ public class Peer {
     private ArrayList<User> users;
     private ArrayList<ChatRoom> chatRooms;
     private ArrayList<ServerConnection> serverConnections;
-    private final String COMMONSPACE = "commonSpace";
 
     //Client side
-    private Socket socket;
-    private boolean client_alive;
+    private boolean client_alive = true;
     private String identity;
     private String currentRoomId;
 
@@ -140,10 +140,11 @@ public class Peer {
                             case "delete":
                                 break;
                             case "list":
+                                //localList();
                                 break;
                             case "listneighbors":
                                 break;
-                            case "searchneiwork":
+                            case "searchnetwork":
                                 break;
                         }
                     }
@@ -162,6 +163,7 @@ public class Peer {
 
     public void clientHandle(String hostName, int portNum, String localPort){
         Socket socket;
+
         try {
             if (localPort == null){
                 socket = new Socket(hostName, portNum);
@@ -175,12 +177,12 @@ public class Peer {
             currentConnection = true;
 
 
-//            Client.ChatClient conn = new Client.ChatClient(socket);
-//            if (conn != null) {
-//                conn.run();
-//            }
-//            else
-//                System.out.println("Connection failed");
+            clientConnection conn = new clientConnection(socket);
+            if (conn != null) {
+                conn.run();
+            }
+            else
+                System.out.println("Connection failed");
 
         } catch (UnknownHostException e) {
             e.printStackTrace();
@@ -206,12 +208,18 @@ public class Peer {
             int clientPort = socket.getPort();
             user = new User(clientAddress+":"+clientPort, clientAddress, clientPort);
             users.add(user);
-            //ChatRoom.selectById(chatRooms, COMMONSPACE).addRoomUser(user);
-            //user.setRoomid(COMMONSPACE);
+
+            General newHost = new General((Types.HOSTCHANGE.type));
+            newHost.setHost(clientAddress+":"+clientPort);
+            serverWriter.print(gson.toJson(newHost));
+            serverWriter.println();
+            serverWriter.flush();
         }
 
         @Override
         public void run() {
+            connection_alive = true;
+            initialize();
 
         }
     }
@@ -245,7 +253,37 @@ public class Peer {
 
         @Override
         public void run() {
+            connection_alive = true;
+            currentRoomId = "";
 
+            new Thread(new InputMsg()).start();
+        }
+
+        private class InputMsg implements Runnable {
+
+            @Override
+            public void run() {
+                while (connection_alive == true) {
+                    try {
+                        String inputLine = clientReader.readLine();
+                        if (inputLine == null){
+                            System.out.println("Connection failed");
+                            connection_alive = false;
+                        }
+                        else {
+                            General fromServer = gson.fromJson(inputLine, General.class);
+                            if (fromServer.getType().equals(Types.HOSTCHANGE.type)) {
+                                identity = fromServer.getHost();
+                            }
+
+                            System.out.printf("[%s] %s>", currentRoomId, identity);
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                close();
+            }
         }
     }
 }

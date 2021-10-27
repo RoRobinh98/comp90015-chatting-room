@@ -17,7 +17,8 @@ public enum Types {
     ROOMCONTENTS("roomcontents"),
     WHO("who"),
     LIST("list"),
-    QUIT("quit");
+    QUIT("quit"),
+    HOSTCHANGE("hostchange"),;
 
     public String type;
     Types(String type) {

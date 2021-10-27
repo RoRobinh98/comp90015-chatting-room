@@ -16,6 +16,7 @@ public class General {
     private String owner;
     private ArrayList<Room> rooms;
     private String content;
+    private String host;
 
     public General(String type) {
         this.type = type;
@@ -82,6 +83,14 @@ public class General {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
     }
 
     @Override
