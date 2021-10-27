@@ -13,7 +13,9 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 public class Peer {
     private Gson gson = new Gson();
@@ -136,6 +138,7 @@ public class Peer {
                             case "help":
                                 break;
                             case "createroom":
+                                createRoom(inputPart[1]);
                                 break;
                             case "delete":
                                 break;
@@ -156,6 +159,35 @@ public class Peer {
                 e.printStackTrace();
             }
 
+        }
+
+        private void createRoom(String input) {
+            if (input.length() >= 3 && input.length() <= 32) {
+                if (input.substring(0,1).matches("[A-Za-z]") && input.matches("^[A-Za-z0-9]+$")) {
+                    if (chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(input)) {
+                        System.out.printf("Room %s is invalid or already in use.", input);
+                        System.out.println();
+                        return;
+                    }
+                   ChatRoom chatRoom = new ChatRoom(input);
+                   chatRooms.add(chatRoom);
+                    System.out.printf("Room %s created.", input);
+                    System.out.println();
+                   return;
+                }
+
+                else {
+                    System.out.println("Starting with an upper or lower case character");
+                    System.out.println("And upper and lower case characters only and digits");
+                    System.out.print(">");
+                }
+            }
+            else {
+                System.out.println("The room name must be at least 3 characters " +
+                        "and no more than 32 characters");
+                System.out.print(">");
+            }
+            return;
         }
     }
 
@@ -220,7 +252,50 @@ public class Peer {
         public void run() {
             connection_alive = true;
             initialize();
+            while (connection_alive) {
+                String inputLine = null;
+                try {
+                    inputLine = serverReader.readLine();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                General message = gson.fromJson(inputLine, General.class);
+                if (inputLine == null) {
+                    connection_alive = false;
+                } else if (Types.MESSAGE.type.equals(message.getType())) {
+                    broadcastMessage(message);
+                }
+            }
 
+        }
+
+        public synchronized void broadcastMessage(General inputLine) {
+            General message = new General(Types.MESSAGE.type);
+            message.setIdentity(this.user.getIdentity());
+            message.setContent(inputLine.getContent());
+            broadCast(gson.toJson(message), chatRooms, this.user.getRoomid());
+        }
+
+        private synchronized void broadCast(String message, ArrayList<ChatRoom> chatRoom, String roomName) {
+            ChatRoom room = ChatRoom.selectById(chatRoom, roomName);
+            for (User user : room.getRoomUsers()) {
+                getByUser(serverConnections,user).sendMessage(message);
+            }
+        }
+
+        public synchronized void sendMessage(String message) {
+            serverWriter.print(message);
+            serverWriter.println();
+            serverWriter.flush();
+        }
+
+        private ServerConnection getByUser(ArrayList<ServerConnection> chatConnections, User user){
+            for(ServerConnection connection : chatConnections){
+                if(connection.user.equals(user)){
+                    return connection;
+                }
+            }
+            return null;
         }
     }
 
@@ -257,6 +332,7 @@ public class Peer {
             currentRoomId = "";
 
             new Thread(new InputMsg()).start();
+            new Thread(new OutputMsg()).start();
         }
 
         private class InputMsg implements Runnable {
@@ -275,6 +351,10 @@ public class Peer {
                             if (fromServer.getType().equals(Types.HOSTCHANGE.type)) {
                                 identity = fromServer.getHost();
                             }
+                            else if(fromServer.getType().equals(Types.MESSAGE.type)) {
+                                System.out.printf("%s: %s", fromServer.getIdentity(), fromServer.getContent());
+                                System.out.println();
+                            }
 
                             System.out.printf("[%s] %s>", currentRoomId, identity);
                         }
@@ -283,6 +363,26 @@ public class Peer {
                     }
                 }
                 close();
+            }
+        }
+
+        private class OutputMsg implements Runnable {
+
+            @Override
+            public void run() {
+                while (connection_alive) {
+                    Scanner scanner = new Scanner(System.in);
+                    String input = scanner.nextLine();
+                    String[] inputPart = input.split(" ");
+                    if (input != null && !"#".equals(input.substring(0, 1))) {
+                        General message = new General(Types.MESSAGE.type);
+                        message.setContent(input);
+                        input = gson.toJson(message);
+                        clientWriter.print(input);
+                        clientWriter.println();
+                        clientWriter.flush();
+                    }
+                }
             }
         }
     }
