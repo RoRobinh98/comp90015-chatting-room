@@ -149,6 +149,21 @@ public class Peer {
                                 break;
                             case "searchnetwork":
                                 break;
+                            case "who":
+                                String askId = inputPart[1];
+                                if (!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(askId)){
+                                    System.out.println("The requested room is invalid or non existent");
+                                   }
+                                else {
+                                    ArrayList<String> userIds = new ArrayList<>();
+                                    userIds.addAll(ChatRoom.selectById(chatRooms, askId).getRoomUsers().stream().map(User::getIdentity).collect(Collectors.toList()));
+                                    if (userIds.size() == 0)
+                                    System.out.println(askId + " has no one in the room currently");
+                                    else
+                                    System.out.println(askId + " contains " + allUserIds(userIds));
+
+                                }
+                                break;
                         }
                     }
                 }
@@ -264,6 +279,8 @@ public class Peer {
                     connection_alive = false;
                 } else if (Types.MESSAGE.type.equals(message.getType())) {
                     broadcastMessage(message);
+                } else if (Types.WHO.type.equals(message.getType())) {
+                    replyForWho(message);
                 }
             }
 
@@ -296,6 +313,22 @@ public class Peer {
                 }
             }
             return null;
+        }
+
+        public synchronized void replyForWho(General inputLine){
+            String targetRoomId = inputLine.getRoomid();
+            General reply = new General(Types.ROOMCONTENTS.type);
+            if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)){
+                reply.setRoomid("");
+                sendMessage(gson.toJson(reply));
+                return;
+            }
+            ArrayList<String> userIds = new ArrayList<>();
+            ChatRoom chatRoom = ChatRoom.selectById(chatRooms, targetRoomId);
+            userIds.addAll(chatRoom.getRoomUsers().stream().map(User::getIdentity).collect(Collectors.toList())) ;
+            reply.setRoomid(targetRoomId);
+            reply.setIdentities(userIds);
+            sendMessage(gson.toJson(reply));
         }
     }
 
@@ -355,6 +388,17 @@ public class Peer {
                                 System.out.printf("%s: %s", fromServer.getIdentity(), fromServer.getContent());
                                 System.out.println();
                             }
+                            else if(fromServer.getType().equals(Types.ROOMCONTENTS.type)){
+                                if (fromServer.getRoomid().equals("")) {
+                                    System.out.println("The requested room is invalid or non existent");
+                                }
+                                else {
+                                    if (fromServer.getIdentities().size() == 0)
+                                        System.out.println(fromServer.getRoomid() + " has no one in the room currently");
+                                    else
+                                        System.out.println(fromServer.getRoomid() + " contains " + allUserIds(fromServer.getIdentities()));
+                                }
+                            }
 
                             System.out.printf("[%s] %s>", currentRoomId, identity);
                         }
@@ -375,15 +419,48 @@ public class Peer {
                     String input = scanner.nextLine();
                     String[] inputPart = input.split(" ");
                     if (input != null && !"#".equals(input.substring(0, 1))) {
-                        General message = new General(Types.MESSAGE.type);
-                        message.setContent(input);
-                        input = gson.toJson(message);
-                        clientWriter.print(input);
-                        clientWriter.println();
-                        clientWriter.flush();
+                        if (currentRoomId.equals("")){
+                            System.out.println("Please join a room before sending messages");
+                        }
+                        else {
+                            General message = new General(Types.MESSAGE.type);
+                            message.setContent(input);
+                            input = gson.toJson(message);
+                            clientWriter.print(input);
+                            clientWriter.println();
+                            clientWriter.flush();
+                        }
+                    }
+                    else {
+                        if ("#".equals(input.substring(0, 1))) {
+                            switch (inputPart[0].substring(1)) {
+                                case "who":
+                                    askWho (inputPart[1]);
+                                    break;
+                            }
+                        }
                     }
                 }
             }
+
+            public synchronized void askWho(String input){
+                General command = new General(Types.WHO.type);
+                command.setRoomid(input);
+                clientWriter.print(gson.toJson(command));
+                clientWriter.println();
+                clientWriter.flush();
+                return;
+            }
         }
+
+
+    }
+
+    String allUserIds(ArrayList<String> identities){
+        String result = "";
+        for (String identity:identities){
+            result = result+" "+identity;
+        }
+        return result;
     }
 }
