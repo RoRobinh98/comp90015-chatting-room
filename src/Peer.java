@@ -1,8 +1,6 @@
 import Identity.ChatRoom;
 import Identity.User;
 import com.google.gson.Gson;
-import jsonFile.General;
-import jsonFile.Types;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -11,19 +9,16 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.UnknownHostException;
+import java.net.*;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Scanner;
 
 public class Peer {
     private Gson gson = new Gson();
     private boolean currentConnection = false;
 
     //Server side
-    private boolean handler_alive = false;
+    private boolean server_alive = false;
     private ArrayList<User> users;
     private ArrayList<ChatRoom> chatRooms;
     private ArrayList<ServerConnection> serverConnections;
@@ -31,14 +26,14 @@ public class Peer {
 
     //Client side
     private Socket socket;
-    private boolean connection_alive;
+    private boolean client_alive;
     private String identity;
     private String currentRoomId;
 
     public Peer() {
         users = new ArrayList<>();
         chatRooms = new ArrayList<>();
-        chatRooms.add(new ChatRoom(COMMONSPACE));
+        //chatRooms.add(new ChatRoom(COMMONSPACE));
         serverConnections = new ArrayList<>();
     }
 
@@ -85,10 +80,10 @@ public class Peer {
             try {
                 serverSocket = new ServerSocket(portNum);
 
-                System.out.printf("Listening on port %d\n", portNum);
-                handler_alive = true;
+                //System.out.printf("Listening on port %d\n", portNum);
+                server_alive = true;
 
-                while (handler_alive) {
+                while (server_alive) {
                     Socket newSocket = serverSocket.accept();
 
                     System.out.println(newSocket.getInetAddress().getHostAddress());
@@ -101,13 +96,13 @@ public class Peer {
                         conn.start();
                         conn.interrupt();
                     } else {
-                        handler_alive = false;
+                        server_alive = false;
                     }
 
                 }
             } catch (IOException e) {
                 System.out.printf("Error handling conns, %s\n", e.getMessage());
-                handler_alive = false;
+                server_alive = false;
             }
         }
         private void enter(ServerConnection connection) {
@@ -120,7 +115,40 @@ public class Peer {
         @Override
         public void run() {
             try {
-               clientHandle("localhost", 4444,5000);
+                while (client_alive) {
+                    System.out.print(">");
+                    Scanner scanner = new Scanner(System.in);
+                    String input = scanner.nextLine();
+                    String[] inputPart = input.split(" ");
+                    if (input != null && "#".equals(input.substring(0, 1))) {
+                        switch (inputPart[0].substring(1)) {
+                            case "connect":
+                                String target = inputPart[1];
+                                String targetAddress  =target.split(":")[0];
+                                int targetPort = Integer.parseInt(target.split(":")[1]);
+                                String localPort;
+                                if(inputPart.length == 3)
+                                    localPort = inputPart[2];
+                                else
+                                    localPort = null;
+                                clientHandle(targetAddress, targetPort,localPort);
+                                break;
+                            case "help":
+                                break;
+                            case "createroom":
+                                break;
+                            case "delete":
+                                break;
+                            case "list":
+                                break;
+                            case "listneighbors":
+                                break;
+                            case "searchneiwork":
+                                break;
+                        }
+                    }
+                }
+
 
             } catch (Exception e) {
                 System.out.println("command line error");
@@ -132,13 +160,20 @@ public class Peer {
 
 
 
-    public void clientHandle(String hostName, int portNum, int localPort){
+    public void clientHandle(String hostName, int portNum, String localPort){
         Socket socket;
         try {
+            if (localPort == null){
+                socket = new Socket(hostName, portNum);
+            }
+            else {
+                int port = Integer.parseInt(localPort);
+                socket=new Socket();
+                socket.bind(new InetSocketAddress(port));
+                socket.connect(new InetSocketAddress(hostName,portNum));
+            }
             currentConnection = true;
-            socket=new Socket();
-            socket.bind(new InetSocketAddress(localPort));
-            socket.connect(new InetSocketAddress(hostName,portNum));
+
 
 //            Client.ChatClient conn = new Client.ChatClient(socket);
 //            if (conn != null) {
@@ -171,8 +206,41 @@ public class Peer {
             int clientPort = socket.getPort();
             user = new User(clientAddress+":"+clientPort, clientAddress, clientPort);
             users.add(user);
-            ChatRoom.selectById(chatRooms, COMMONSPACE).addRoomUser(user);
-            user.setRoomid(COMMONSPACE);
+            //ChatRoom.selectById(chatRooms, COMMONSPACE).addRoomUser(user);
+            //user.setRoomid(COMMONSPACE);
+        }
+
+        @Override
+        public void run() {
+
+        }
+    }
+
+    class clientConnection extends Thread {
+        private Socket socket;
+        private PrintWriter clientWriter;
+        private BufferedReader clientReader;
+        private boolean connection_alive;
+        private String identity;
+        private String currentRoomId;
+
+        public clientConnection(Socket socket) throws IOException {
+            this.socket = socket;
+            this.clientReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            this.clientWriter = new PrintWriter(socket.getOutputStream());
+
+        }
+
+        public void close() {
+            try {
+                System.out.printf("Disconnected from %s",socket.getLocalAddress().getCanonicalHostName());
+                System.out.println();
+                clientReader.close();
+                clientWriter.close();
+                socket.close();
+            } catch (IOException e) {
+                System.out.println("Error closing conn");
+            }
         }
 
         @Override
