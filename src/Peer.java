@@ -169,6 +169,9 @@ public class Peer {
                                 }
                                 break;
                             case "searchnetwork":
+                                List<String> neighborList1 = users.stream().map(User::getIdentity).collect(Collectors.toList());
+                                List<String> searchedList = new ArrayList<>();
+                                searchNetwork(neighborList1, searchedList);
                                 break;
                             case "who":
                                 String askId = inputPart[1];
@@ -722,4 +725,79 @@ public class Peer {
         return null;
     }
 
+    private void searchNetwork(List<String> hostList, List<String> searchedList) {
+        if (hostList == null || hostList.size() == 0)
+            return;
+        else {
+            for(String host:hostList) {
+                if (searchedList.contains(host))
+                    continue;
+                searchedList.add(host);
+                String hostAddress = host.split(":")[0];
+                int hostPort = Integer.parseInt(host.split(":")[1]);
+                searchNetwork(responseForSearch(hostAddress, hostPort), searchedList);
+            }
+        }
+    }
+
+    public List<String> responseForSearch(String hostAddress, int hostPort){
+        Socket socket;
+
+        try {
+                socket = new Socket(hostAddress, hostPort);
+            BufferedReader clientReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            PrintWriter clientWriter = new PrintWriter(socket.getOutputStream());
+            identity = socket.getLocalAddress().getHostAddress() + ":" + socket.getPort();
+            General hostChange = new General((Types.HOSTCHANGE.type));
+            hostChange.setHost(identity);
+            clientWriter.print(gson.toJson(hostChange));
+            clientWriter.println();
+            clientWriter.flush();
+
+            General command1 = new General(Types.LIST.type);
+            clientWriter.print(gson.toJson(command1));
+            clientWriter.println();
+            clientWriter.flush();
+            String inputLine = clientReader.readLine();
+            //TODO print list
+
+            General command2 = new General(Types.LISTNEIGHBORS.type);
+            clientWriter.print(gson.toJson(command2));
+            clientWriter.println();
+            clientWriter.flush();
+
+            inputLine = clientReader.readLine();
+            General fromServer = gson.fromJson(inputLine, General.class);
+            if (fromServer.getNeighbors().size() == 0 || fromServer.getNeighbors() == null) {
+                System.out.println("No neighbors detected");
+            }
+            else {
+                for(String neighbor: fromServer.getNeighbors()){
+                    System.out.println(neighbor);
+                }
+            }
+
+            General command3 = new General(Types.QUIT.type);
+            clientWriter.print(gson.toJson(command3));
+            clientWriter.println();
+            clientWriter.flush();
+
+            clientReader.close();
+            clientWriter.close();
+            socket.close();
+
+            return fromServer.getNeighbors();
+
+        } catch (UnknownHostException e) {
+            System.out.println("Connection failed");
+            e.printStackTrace();
+            currentConnection = false;
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.out.println("Connection failed");
+            currentConnection = false;
+        }
+
+        return null;
+    }
 }
