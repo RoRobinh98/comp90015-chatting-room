@@ -342,7 +342,6 @@ public class Peer {
         private Socket socket;
         private PrintWriter clientWriter;
         private BufferedReader clientReader;
-        private boolean connection_alive;
         private String identity;
         private String currentRoomId;
 
@@ -367,7 +366,6 @@ public class Peer {
 
         @Override
         public void run() {
-            connection_alive = true;
             currentRoomId = "";
             identity = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
             General hostChange = new General((Types.HOSTCHANGE.type));
@@ -385,12 +383,12 @@ public class Peer {
 
             @Override
             public void run() {
-                while (connection_alive == true) {
+                while (currentConnection) {
                     try {
                         String inputLine = clientReader.readLine();
                         if (inputLine == null){
                             System.out.println("Connection failed");
-                            connection_alive = false;
+                            currentConnection = false;
                         }
                         else {
                             General fromServer = gson.fromJson(inputLine, General.class);
@@ -428,7 +426,7 @@ public class Peer {
 
             @Override
             public void run() {
-                while (connection_alive) {
+                while (currentConnection) {
                     Scanner scanner = new Scanner(System.in);
                     String input = scanner.nextLine();
                     String[] inputPart = input.split(" ");
