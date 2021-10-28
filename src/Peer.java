@@ -21,6 +21,7 @@ public class Peer {
     private Gson gson = new Gson();
     private boolean currentConnection = false;
     private String target;
+    private List<String> blackList;
 
     //Server side
     private boolean server_alive = false;
@@ -38,6 +39,7 @@ public class Peer {
         chatRooms = new ArrayList<>();
         //chatRooms.add(new ChatRoom(COMMONSPACE));
         serverConnections = new ArrayList<>();
+        blackList = new ArrayList<>();
     }
 
     public static void main(String[] args) {
@@ -176,6 +178,12 @@ public class Peer {
 
                                 }
                                 break;
+                            case "kick":
+                                doKick(inputPart[1]);
+                                break;
+                            default:
+                                System.out.println("Invalid command, use #help to see instructions");
+                                break;
                         }
                     }
                 }
@@ -216,6 +224,18 @@ public class Peer {
             }
             return;
         }
+
+        private void doKick(String input) throws IOException {
+                User kickOne = getByIdentity(input);
+                if (kickOne == null){
+                    System.out.println("No such user");
+                    return;
+                }
+                ServerConnection serverConnection = getByUser(serverConnections,kickOne);
+                serverConnection.socket.close();
+                System.out.printf("User %s has been kicked off", input);
+                System.out.println();
+        }
     }
 
 
@@ -244,9 +264,13 @@ public class Peer {
                 System.out.println("Connection failed");
 
         } catch (UnknownHostException e) {
+            System.out.println("Connection failed");
             e.printStackTrace();
+            currentConnection = false;
         } catch (IOException e) {
             e.printStackTrace();
+            System.out.println("Connection failed");
+            currentConnection = false;
         }
     }
 
@@ -321,14 +345,6 @@ public class Peer {
             serverWriter.flush();
         }
 
-        private ServerConnection getByUser(ArrayList<ServerConnection> chatConnections, User user){
-            for(ServerConnection connection : chatConnections){
-                if(connection.user.equals(user)){
-                    return connection;
-                }
-            }
-            return null;
-        }
 
         public synchronized void replyForWho(General inputLine){
             String targetRoomId = inputLine.getRoomid();
@@ -510,6 +526,24 @@ public class Peer {
             result = result+" "+identity;
         }
         return result;
+    }
+
+    private ServerConnection getByUser(ArrayList<ServerConnection> chatConnections, User user){
+        for(ServerConnection connection : chatConnections){
+            if(connection.user.equals(user)){
+                return connection;
+            }
+        }
+        return null;
+    }
+
+    private User getByIdentity(String identity){
+        for (User user:users){
+            if (user.getIdentity().equals(identity))
+                return user;
+        }
+
+        return null;
     }
 
 }
