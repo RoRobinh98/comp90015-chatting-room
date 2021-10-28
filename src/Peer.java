@@ -2,6 +2,7 @@ import Identity.ChatRoom;
 import Identity.User;
 import com.google.gson.Gson;
 import jsonFile.General;
+import jsonFile.Room;
 import jsonFile.Types;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -144,14 +145,20 @@ public class Peer {
 
                                 break;
                             case "help":
+                                askHelp();
                                 break;
                             case "createroom":
                                 createRoom(inputPart[1]);
                                 break;
                             case "delete":
+                                askDelete(inputPart[1]);
                                 break;
                             case "list":
-                                //localList();
+                                General roomList = new General(Types.ROOMLIST.type);
+                                roomList.setRooms(Room.fromChatRoomToRoom(chatRooms));
+                                for(Room room: roomList.getRooms()){
+                                    System.out.println(room.toString() + " guest(s)");
+                                }
                                 break;
                             case "listneighbors":
                                 List<String> neighborList = users.stream().map(User::getIdentity).collect(Collectors.toList());
@@ -175,7 +182,6 @@ public class Peer {
                                     System.out.println(askId + " has no one in the room currently");
                                     else
                                     System.out.println(askId + " contains " + allUserIds(userIds));
-
                                 }
                                 break;
                             case "kick":
@@ -235,6 +241,46 @@ public class Peer {
                 serverConnection.socket.close();
                 System.out.printf("User %s has been kicked off", input);
                 System.out.println();
+        }
+
+        private void askDelete(String input) throws IOException {
+            if (chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(input)) {
+                System.out.printf("Room %s is invalid.", input);
+                System.out.println();
+                return;
+            }
+            else {
+                ChatRoom room = ChatRoom.selectById(chatRooms,input);
+                for(User subUser: room.getRoomUsers()){
+                    General roomChange = new General(Types.ROOMCHANGE.type);
+                    roomChange.setIdentity(subUser.getIdentity());
+                    roomChange.setFormer(subUser.getRoomid());
+                    roomChange.setRoomid("");
+
+                    ServerConnection serverConnection = getByUser(serverConnections,subUser);
+                    serverConnection.serverWriter.print(roomChange);
+                    serverConnection.serverWriter.println();
+                    serverConnection.serverWriter.flush();
+                    serverConnection.socket.close();
+                }
+            }
+        }
+
+
+        public void askHelp(){
+            System.out.println("Local Command:");
+            System.out.println("#createroom - create a chat room");
+            System.out.println("#delete [room identity] - delete a chat room:");
+            System.out.println("#kick [user identity] - kick the user and block them from reconnecting");
+            System.out.println("#help - list the command information");
+            System.out.println("Remote Command:");
+            System.out.println("#join [room identity] - join a chat room within connected peer");
+            System.out.println("#who [room identity] - list all users in chat room:");
+            System.out.println("#quit - disconnect from a peer");
+            System.out.println("#listneighbors - list all currently connected peers' network address");
+            System.out.println("#connect IP[:port] [local port] - connect to another peer");
+            System.out.println("Special Command:");
+            System.out.println("#searchnetwork - list all connected IP address in the network");
         }
     }
 
@@ -320,6 +366,14 @@ public class Peer {
                     //System.out.println(user.getIdentity());
                 } else if (Types.LISTNEIGHBORS.type.equals(message.getType())) {
                     replyForListNeighbors();
+                } else if (Types.LIST.type.equals(message.getType())){
+                    replyForList();
+                } else if (Types.QUIT.type.equals(message.getType())){
+                    checkEmptyRoom();
+                    replyForQuit();
+                    connection_alive = false;
+                } else if (Types.JOIN.type.equals(message.getType())){
+                    joinRoom(message);
                 }
             }
 
@@ -372,6 +426,66 @@ public class Peer {
             reply.setNeighbors(neighbors);
             sendMessage(gson.toJson(reply));
         }
+
+        public synchronized void replyForList() {
+            General reply = new General(Types.ROOMLIST.type);
+            reply.setRooms(Room.fromChatRoomToRoom(chatRooms));
+            for (Room room: reply.getRooms()){
+                System.out.println(room.toString() + " guest(s)");
+            }
+        }
+
+        public synchronized void replyForQuit(){
+            General quitEntity = new General(Types.ROOMCHANGE.type);
+            quitEntity.setIdentity(this.user.getIdentity());
+            quitEntity.setFormer(this.user.getRoomid());
+            quitEntity.setRoomid("");
+            broadCast(gson.toJson(quitEntity),chatRooms,this.user.getRoomid());
+            for(ChatRoom chatRoom:chatRooms){
+                if(chatRoom.getOwner().equals(this.user.getIdentity())){
+                    chatRoom.setOwner("");
+                }
+            }
+            ChatRoom currentRoom = ChatRoom.selectById(chatRooms,this.user.getRoomid());
+            currentRoom.removeRoomUser(this.user);
+            if(currentRoom.getRoomUsers().size() == 0 && currentRoom.getOwner().equals("")){
+                chatRooms.remove(currentRoom);
+            }
+        }
+
+        private synchronized void checkEmptyRoom(){
+            for(ChatRoom chatRoom : chatRooms){
+                if(chatRoom.getOwner().equals("") && chatRoom.getRoomUsers().size()==0){
+                    chatRooms.remove(chatRoom);
+                }
+            }
+        }
+
+        public synchronized void joinRoom(General inputLine) {
+            String targetRoomId = inputLine.getRoomid();
+            if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)) {
+                General failToChange = new General(Types.ROOMCHANGE.type);
+                failToChange.setIdentity(this.user.getIdentity());
+                failToChange.setFormer(this.user.getRoomid());
+                failToChange.setRoomid(this.user.getRoomid());
+                sendMessage(gson.toJson(failToChange));
+            }
+            else {
+                General successfulChange = new General(Types.ROOMCHANGE.type);
+                successfulChange.setIdentity(this.user.getIdentity());
+                successfulChange.setFormer(this.user.getRoomid());
+                successfulChange.setRoomid(targetRoomId);
+                broadCast(gson.toJson(successfulChange), chatRooms, this.user.getRoomid());
+                broadCast(gson.toJson(successfulChange), chatRooms, targetRoomId);
+                ChatRoom.selectById(chatRooms,this.user.getRoomid()).removeRoomUser(this.user);
+                ChatRoom.selectById(chatRooms,targetRoomId).addRoomUser(this.user);
+                this.user.setRoomid(targetRoomId);
+            }
+        }
+
+
+
+
     }
 
     class clientConnection extends Thread {
@@ -455,6 +569,32 @@ public class Peer {
                                         System.out.println(neighbor);
                                     }
                                 }
+                            } else if(fromServer.getType().equals(Types.ROOMLIST.type)){
+                                for(Room room:fromServer.getRooms()){
+                                    System.out.println(room.toString() + " guest(s)");
+                                }
+//                                if (null != fromServer.getContent()) {
+//                                    System.out.println(fromServer.getContent());
+//                                    listAllRooms(fromServer.getRooms());
+//
+//                                } else {
+//                                    listAllRooms(fromServer.getRooms());
+//                                }
+                            } else if(fromServer.getType().equals(Types.ROOMCHANGE.type)){
+                                if (fromServer.getFormer().equals(fromServer.getRoomid())) {
+                                    System.out.println("The requested room is invalid or non existent");
+                                } else if (fromServer.getRoomid().equals("")) {
+                                    System.out.printf("%s leaves %s", fromServer.getIdentity(), fromServer.getFormer());
+                                    System.out.println();
+                                    if (fromServer.getIdentity().equals(identity)) {
+                                        currentConnection = false;
+                                    }
+                                } else {
+                                    System.out.printf("%s moved from %s to %s", fromServer.getIdentity(), fromServer.getFormer(), fromServer.getRoomid());
+                                    System.out.println();
+                                    if (fromServer.getIdentity().equals(identity))
+                                        currentRoomId = fromServer.getRoomid();
+                                }
                             }
 
                             System.out.printf("[%s] %s>", currentRoomId, identity);
@@ -501,6 +641,17 @@ public class Peer {
                                     clientWriter.print(gson.toJson(command));
                                     clientWriter.println();
                                     clientWriter.flush();
+                                    break;
+                                case "list":
+                                    askList();
+                                    break;
+                                case "join":
+                                    joinRoom(inputPart[1]);
+                                    break;
+                                case "quit":
+                                    askQuit();
+                                    currentConnection = false;
+                                    break;
                             }
                         }
                     }
@@ -510,6 +661,31 @@ public class Peer {
             public synchronized void askWho(String input){
                 General command = new General(Types.WHO.type);
                 command.setRoomid(input);
+                clientWriter.print(gson.toJson(command));
+                clientWriter.println();
+                clientWriter.flush();
+                return;
+            }
+
+            public synchronized void askList(){
+                General command = new General(Types.LIST.type);
+                clientWriter.print(gson.toJson(command));
+                clientWriter.println();
+                clientWriter.flush();
+                return;
+            }
+
+            public synchronized void joinRoom(String input){
+                General command = new General(Types.JOIN.type);
+                command.setRoomid(input);
+                clientWriter.print(gson.toJson(command));
+                clientWriter.println();
+                clientWriter.flush();
+                return;
+            }
+
+            public synchronized void askQuit(){
+                General command = new General(Types.QUIT.type);
                 clientWriter.print(gson.toJson(command));
                 clientWriter.println();
                 clientWriter.flush();
