@@ -46,8 +46,10 @@ public class Peer {
         try {
             parser.parseArgument(args);
             Peer peer = new Peer();
-            new Thread(peer.new PeerServer()).start();
-            new Thread(peer.new PeerClient()).start();
+            PeerClient peerClient = peer.new PeerClient();
+            PeerServer peerServer = peer.new PeerServer();
+            new Thread(peerClient).start();
+            new Thread(peerServer).start();
         } catch (CmdLineException e) {
             System.out.println("command lien error");
             e.printStackTrace();
@@ -118,6 +120,8 @@ public class Peer {
         public void run() {
             try {
                 while (client_alive) {
+                    if (currentConnection == true)
+                        continue;
                     System.out.print(">");
                     Scanner scanner = new Scanner(System.in);
                     String input = scanner.nextLine();
@@ -134,6 +138,7 @@ public class Peer {
                                 else
                                     localPort = null;
                                 clientHandle(targetAddress, targetPort,localPort);
+
                                 break;
                             case "help":
                                 break;
@@ -255,18 +260,12 @@ public class Peer {
             int clientPort = socket.getPort();
             user = new User(clientAddress+":"+clientPort, clientAddress, clientPort);
             users.add(user);
-
-            General newHost = new General((Types.HOSTCHANGE.type));
-            newHost.setHost(clientAddress+":"+clientPort);
-            serverWriter.print(gson.toJson(newHost));
-            serverWriter.println();
-            serverWriter.flush();
         }
 
         @Override
         public void run() {
             connection_alive = true;
-            initialize();
+            //initialize();
             while (connection_alive) {
                 String inputLine = null;
                 try {
@@ -281,6 +280,13 @@ public class Peer {
                     broadcastMessage(message);
                 } else if (Types.WHO.type.equals(message.getType())) {
                     replyForWho(message);
+                } else if (Types.HOSTCHANGE.type.equals(message.getType())) {
+                    String hostName = message.getHost();
+                    String hostAddress = hostName.split(":")[0];
+                    int hostPort = Integer.parseInt(hostName.split(":")[1]);
+                    user = new User(message.getHost(), hostAddress, hostPort);
+                    users.add(user);
+                    //System.out.println(user.getIdentity());
                 }
             }
 
@@ -363,7 +369,14 @@ public class Peer {
         public void run() {
             connection_alive = true;
             currentRoomId = "";
+            identity = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
+            General hostChange = new General((Types.HOSTCHANGE.type));
+            hostChange.setHost(identity);
+            clientWriter.print(gson.toJson(hostChange));
+            clientWriter.println();
+            clientWriter.flush();
 
+            System.out.printf("[%s] %s>", currentRoomId, identity);
             new Thread(new InputMsg()).start();
             new Thread(new OutputMsg()).start();
         }
@@ -407,6 +420,7 @@ public class Peer {
                     }
                 }
                 close();
+
             }
         }
 
@@ -421,6 +435,7 @@ public class Peer {
                     if (input != null && !"#".equals(input.substring(0, 1))) {
                         if (currentRoomId.equals("")){
                             System.out.println("Please join a room before sending messages");
+                            System.out.printf("[%s] %s>", currentRoomId, identity);
                         }
                         else {
                             General message = new General(Types.MESSAGE.type);
