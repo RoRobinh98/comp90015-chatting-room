@@ -18,7 +18,9 @@ public enum Types {
     WHO("who"),
     LIST("list"),
     QUIT("quit"),
-    HOSTCHANGE("hostchange"),;
+    HOSTCHANGE("hostchange"),
+    NEIGHBORS("neighbors"),
+    LISTNEIGHBORS("listneighbors"),;
 
     public String type;
     Types(String type) {

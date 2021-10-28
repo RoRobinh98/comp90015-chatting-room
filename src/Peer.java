@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 public class Peer {
     private Gson gson = new Gson();
     private boolean currentConnection = false;
+    private String target;
 
     //Server side
     private boolean server_alive = false;
@@ -129,7 +130,7 @@ public class Peer {
                     if (input != null && "#".equals(input.substring(0, 1))) {
                         switch (inputPart[0].substring(1)) {
                             case "connect":
-                                String target = inputPart[1];
+                                target = inputPart[1];
                                 String targetAddress  =target.split(":")[0];
                                 int targetPort = Integer.parseInt(target.split(":")[1]);
                                 String localPort;
@@ -151,6 +152,12 @@ public class Peer {
                                 //localList();
                                 break;
                             case "listneighbors":
+                                List<String> neighborList = users.stream().map(User::getIdentity).collect(Collectors.toList());
+                                if (neighborList.size() == 0)
+                                    System.out.println("No neighbors detected");
+                                for(String neighbor:neighborList){
+                                    System.out.println(neighbor);
+                                }
                                 break;
                             case "searchnetwork":
                                 break;
@@ -287,6 +294,8 @@ public class Peer {
                     user = new User(message.getHost(), hostAddress, hostPort);
                     users.add(user);
                     //System.out.println(user.getIdentity());
+                } else if (Types.LISTNEIGHBORS.type.equals(message.getType())) {
+                    replyForListNeighbors();
                 }
             }
 
@@ -336,6 +345,17 @@ public class Peer {
             reply.setIdentities(userIds);
             sendMessage(gson.toJson(reply));
         }
+
+        public synchronized void replyForListNeighbors() {
+            List<String> neighbors = new ArrayList<>();
+            if (currentConnection == true) {
+                neighbors.add(target);
+            }
+            neighbors.addAll(users.stream().map(User::getIdentity).filter(string -> string.equals(user.getIdentity())).collect(Collectors.toList()));
+            General reply = new General(Types.NEIGHBORS.type);
+            reply.setNeighbors(neighbors);
+            sendMessage(gson.toJson(reply));
+        }
     }
 
     class clientConnection extends Thread {
@@ -354,7 +374,7 @@ public class Peer {
 
         public void close() {
             try {
-                System.out.printf("Disconnected from %s",socket.getLocalAddress().getCanonicalHostName());
+                System.out.printf("Disconnected from %s",socket.getInetAddress().getCanonicalHostName());
                 System.out.println();
                 clientReader.close();
                 clientWriter.close();
@@ -367,7 +387,7 @@ public class Peer {
         @Override
         public void run() {
             currentRoomId = "";
-            identity = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
+            identity = socket.getLocalAddress().getHostAddress() + ":" + socket.getPort();
             General hostChange = new General((Types.HOSTCHANGE.type));
             hostChange.setHost(identity);
             clientWriter.print(gson.toJson(hostChange));
@@ -410,6 +430,16 @@ public class Peer {
                                         System.out.println(fromServer.getRoomid() + " contains " + allUserIds(fromServer.getIdentities()));
                                 }
                             }
+                            else if(fromServer.getType().equals(Types.NEIGHBORS.type)){
+                                if (fromServer.getNeighbors().size() == 0) {
+                                    System.out.println("No neighbors detected");
+                                }
+                                else {
+                                    for(String neighbor: fromServer.getNeighbors()){
+                                        System.out.println(neighbor);
+                                    }
+                                }
+                            }
 
                             System.out.printf("[%s] %s>", currentRoomId, identity);
                         }
@@ -450,6 +480,11 @@ public class Peer {
                                 case "who":
                                     askWho (inputPart[1]);
                                     break;
+                                case "listneighbors" :
+                                    General command = new General(Types.LISTNEIGHBORS.type);
+                                    clientWriter.print(gson.toJson(command));
+                                    clientWriter.println();
+                                    clientWriter.flush();
                             }
                         }
                     }
@@ -476,4 +511,5 @@ public class Peer {
         }
         return result;
     }
+
 }

@@ -1,6 +1,7 @@
 package jsonFile;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author JiazheHou
@@ -17,6 +18,7 @@ public class General {
     private ArrayList<Room> rooms;
     private String content;
     private String host;
+    private List<String> neighbors;
 
     public General(String type) {
         this.type = type;
@@ -91,6 +93,14 @@ public class General {
 
     public void setHost(String host) {
         this.host = host;
+    }
+
+    public List<String> getNeighbors() {
+        return neighbors;
+    }
+
+    public void setNeighbors(List<String> neighbors) {
+        this.neighbors = neighbors;
     }
 
     @Override
