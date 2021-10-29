@@ -481,10 +481,10 @@ public class Peer {
         }
 
         public synchronized void replyForShout(General message) {
-            if (message.getShoutedList().contains(identity))
-                return;
+//            if (message.getShoutedList().contains(identity))
+//                return;
 
-            System.out.printf("%s shouted", message.getShoutIdentity());
+//            System.out.printf("%s shouted", message.getShoutIdentity());
             General command = new General(Types.SHOUT.type);
             command.setShoutIdentity(identity);
             message.getShoutedList().add(identity);
