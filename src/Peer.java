@@ -541,7 +541,8 @@ public class Peer {
         @Override
         public void run() {
             currentRoomId = "";
-            identity = socket.getLocalAddress().getHostAddress() + ":" + socket.getPort();
+            identity = socket.getLocalAddress().getHostAddress() + ":" + socket.getLocalPort();
+            System.out.println(identity);
             General hostChange = new General((Types.HOSTCHANGE.type));
             hostChange.setHost(identity);
             clientWriter.print(gson.toJson(hostChange));
