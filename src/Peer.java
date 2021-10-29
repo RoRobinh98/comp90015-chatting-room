@@ -622,11 +622,11 @@ public class Peer {
                                     continue;
 
                                 System.out.printf("%s shouted", fromServer.getShoutIdentity());
+                                System.out.println();
                                 General command = new General(Types.SHOUT.type);
                                 command.setShoutIdentity(identity);
                                 fromServer.getShoutedList().add(identity);
                                 command.setShoutedList(fromServer.getShoutedList());
-                                System.out.printf("%s shouted",fromServer.getShoutIdentity());
                                 for (ServerConnection serverConnection:serverConnections){
                                     serverConnection.sendMessage(gson.toJson(command));
                                 }
