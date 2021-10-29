@@ -29,6 +29,7 @@ public class Peer {
     private ArrayList<User> users;
     private ArrayList<ChatRoom> chatRooms;
     private ArrayList<ServerConnection> serverConnections;
+    private ServerSocket serverSocket;
 
     //Client side
     private boolean client_alive = true;
@@ -85,7 +86,7 @@ public class Peer {
         }
 
         public void serverHandle(int portNum) {
-            ServerSocket serverSocket;
+            //ServerSocket serverSocket;
             try {
                 serverSocket = new ServerSocket(portNum);
 
@@ -465,13 +466,14 @@ public class Peer {
         }
 
         public synchronized void replyForShout(General message) {
-            if (message.getShoutedList().contains(identity))
+            String serverIdentity = serverSocket.getLocalSocketAddress()+":"+serverSocket.getLocalPort();
+            if (message.getShoutedList().contains(serverIdentity))
                 return;
 
 //            System.out.printf("%s shouted", message.getShoutIdentity());
             General command = new General(Types.SHOUT.type);
             command.setShoutIdentity(message.getShoutIdentity());
-            message.getShoutedList().add(identity);
+            message.getShoutedList().add(serverIdentity);
             command.setShoutedList(message.getShoutedList());
             for (ServerConnection serverConnection:serverConnections){
                 if(!serverConnection.user.getRoomid().equals(null) || !serverConnection.user.getRoomid().equals(""))
