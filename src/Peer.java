@@ -34,6 +34,7 @@ public class Peer {
     private boolean client_alive = true;
     private String identity;
     private String currentRoomId;
+    private ClientConnection clientConnection;
 
     public Peer() {
         users = new ArrayList<>();
@@ -304,11 +305,10 @@ public class Peer {
             }
             currentConnection = true;
 
-            System.out.println(socket.getPort());
-            clientConnection conn = new clientConnection(socket);
-            if (conn != null) {
 
-                conn.run();
+            clientConnection = new ClientConnection(socket);
+            if (clientConnection != null) {
+                clientConnection.run();
             }
             else
                 System.out.println("Connection failed");
@@ -340,7 +340,6 @@ public class Peer {
             String clientAddress = socket.getInetAddress().getHostAddress();
             int clientPort = socket.getPort();
             user = new User(clientAddress+":"+clientPort, clientAddress, clientPort);
-            user.setRoomid("");
             users.add(user);
         }
 
@@ -374,11 +373,13 @@ public class Peer {
                 } else if (Types.LIST.type.equals(message.getType())){
                     replyForList();
                 } else if (Types.QUIT.type.equals(message.getType())){
-//                    checkEmptyRoom();
+                    checkEmptyRoom();
                     replyForQuit();
                     connection_alive = false;
                 } else if (Types.JOIN.type.equals(message.getType())){
                     joinRoom(message);
+                } else if (Types.SHOUT.type.equals(message.getType())) {
+                    replyForShout(message);
                 }
             }
 
@@ -435,24 +436,39 @@ public class Peer {
         public synchronized void replyForList() {
             General reply = new General(Types.ROOMLIST.type);
             reply.setRooms(Room.fromChatRoomToRoom(chatRooms));
-            serverWriter.print(gson.toJson(reply));
-            serverWriter.println();
-            serverWriter.flush();
+            for (Room room: reply.getRooms()){
+                System.out.println(room.toString() + " guest(s)");
+            }
         }
 
         public synchronized void replyForQuit(){
             General quitEntity = new General(Types.ROOMCHANGE.type);
             quitEntity.setIdentity(this.user.getIdentity());
             quitEntity.setFormer(this.user.getRoomid());
-            quitEntity.setRoomid(null);
+            quitEntity.setRoomid("");
             broadCast(gson.toJson(quitEntity),chatRooms,this.user.getRoomid());
+            for(ChatRoom chatRoom:chatRooms){
+                if(chatRoom.getOwner().equals(this.user.getIdentity())){
+                    chatRoom.setOwner("");
+                }
+            }
             ChatRoom currentRoom = ChatRoom.selectById(chatRooms,this.user.getRoomid());
             currentRoom.removeRoomUser(this.user);
+            if(currentRoom.getRoomUsers().size() == 0 && currentRoom.getOwner().equals("")){
+                chatRooms.remove(currentRoom);
+            }
+        }
+
+        private synchronized void checkEmptyRoom(){
+            for(ChatRoom chatRoom : chatRooms){
+                if(chatRoom.getOwner().equals("") && chatRoom.getRoomUsers().size()==0){
+                    chatRooms.remove(chatRoom);
+                }
+            }
         }
 
         public synchronized void joinRoom(General inputLine) {
             String targetRoomId = inputLine.getRoomid();
-
             if(!chatRooms.stream().map(ChatRoom::getId).collect(Collectors.toList()).contains(targetRoomId)) {
                 General failToChange = new General(Types.ROOMCHANGE.type);
                 failToChange.setIdentity(this.user.getIdentity());
@@ -465,34 +481,45 @@ public class Peer {
                 successfulChange.setIdentity(this.user.getIdentity());
                 successfulChange.setFormer(this.user.getRoomid());
                 successfulChange.setRoomid(targetRoomId);
-                if(this.user.getRoomid()!=""){
-                    General roomContent = new General(Types.WHO.type);
-                    roomContent.setRoomid(targetRoomId);
-                    replyForWho(roomContent);
-                    broadCast(gson.toJson(successfulChange), chatRooms, this.user.getRoomid());
-                    ChatRoom.selectById(chatRooms,this.user.getRoomid()).removeRoomUser(this.user);
-                } else{
-                    sendMessage(gson.toJson(successfulChange));
-                }
+                broadCast(gson.toJson(successfulChange), chatRooms, this.user.getRoomid());
                 broadCast(gson.toJson(successfulChange), chatRooms, targetRoomId);
+                ChatRoom.selectById(chatRooms,this.user.getRoomid()).removeRoomUser(this.user);
                 ChatRoom.selectById(chatRooms,targetRoomId).addRoomUser(this.user);
                 this.user.setRoomid(targetRoomId);
             }
         }
 
+        public synchronized void replyForShout(General message) {
+            if (message.getShoutedList().contains(identity))
+                return;
+
+            System.out.printf("%s shouted", message.getShoutIdentity());
+            General command = new General(Types.SHOUT.type);
+            command.setShoutIdentity(identity);
+            message.getShoutedList().add(identity);
+            command.setShoutedList(message.getShoutedList());
+
+            for (ServerConnection serverConnection:serverConnections){
+                serverConnection.sendMessage(gson.toJson(command));
+            }
+            if (clientConnection != null && !clientConnection.socket.isClosed()) {
+                clientConnection.sendMessage(gson.toJson(command));
+            }
+
+        }
 
 
 
     }
 
-    class clientConnection extends Thread {
+    class ClientConnection extends Thread {
         private Socket socket;
         private PrintWriter clientWriter;
         private BufferedReader clientReader;
         private String identity;
         private String currentRoomId;
 
-        public clientConnection(Socket socket) throws IOException {
+        public ClientConnection(Socket socket) throws IOException {
             this.socket = socket;
             this.clientReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             this.clientWriter = new PrintWriter(socket.getOutputStream());
@@ -514,7 +541,8 @@ public class Peer {
         @Override
         public void run() {
             currentRoomId = "";
-            identity = socket.getLocalAddress().getHostAddress() + ":" + socket.getPort();
+            identity = socket.getLocalAddress().getHostAddress() + ":" + socket.getLocalPort();
+            System.out.println(identity);
             General hostChange = new General((Types.HOSTCHANGE.type));
             hostChange.setHost(identity);
             clientWriter.print(gson.toJson(hostChange));
@@ -524,6 +552,12 @@ public class Peer {
             System.out.printf("[%s] %s>", currentRoomId, identity);
             new Thread(new InputMsg()).start();
             new Thread(new OutputMsg()).start();
+        }
+
+        private void sendMessage(String message){
+            clientWriter.print(message);
+            clientWriter.println();
+            clientWriter.flush();
         }
 
         private class InputMsg implements Runnable {
@@ -570,28 +604,44 @@ public class Peer {
                                 for(Room room:fromServer.getRooms()){
                                     System.out.println(room.toString() + " guest(s)");
                                 }
+//                                if (null != fromServer.getContent()) {
+//                                    System.out.println(fromServer.getContent());
+//                                    listAllRooms(fromServer.getRooms());
+//
+//                                } else {
+//                                    listAllRooms(fromServer.getRooms());
+//                                }
                             } else if(fromServer.getType().equals(Types.ROOMCHANGE.type)){
                                 if (fromServer.getFormer().equals(fromServer.getRoomid())) {
                                     System.out.println("The requested room is invalid or non existent");
-                                } else if (fromServer.getRoomid()==(null)) {
-                                    System.out.println("in the null");
+                                } else if (fromServer.getRoomid().equals("")) {
                                     System.out.printf("%s leaves %s", fromServer.getIdentity(), fromServer.getFormer());
                                     System.out.println();
                                     if (fromServer.getIdentity().equals(identity)) {
                                         currentConnection = false;
                                     }
-                                } else if(fromServer.getFormer().equals("")){
-                                    System.out.printf("Successfully join the room %s",fromServer.getRoomid());
-                                    System.out.println();
-                                    if (fromServer.getIdentity().equals(identity))
-                                        currentRoomId = fromServer.getRoomid();
-                                }
-                                else {
+                                } else {
                                     System.out.printf("%s moved from %s to %s", fromServer.getIdentity(), fromServer.getFormer(), fromServer.getRoomid());
                                     System.out.println();
                                     if (fromServer.getIdentity().equals(identity))
                                         currentRoomId = fromServer.getRoomid();
                                 }
+                            } else if (fromServer.getType().equals(Types.SHOUT.type)) {
+                                if (fromServer.getShoutedList().contains(identity))
+                                    continue;
+
+                                System.out.printf("%s shouted", fromServer.getShoutIdentity());
+                                General command = new General(Types.SHOUT.type);
+                                command.setShoutIdentity(identity);
+                                fromServer.getShoutedList().add(identity);
+                                command.setShoutedList(fromServer.getShoutedList());
+                                System.out.printf("%s shouted",fromServer.getShoutIdentity());
+                                for (ServerConnection serverConnection:serverConnections){
+                                    serverConnection.sendMessage(gson.toJson(command));
+                                }
+                                clientWriter.print(gson.toJson(command));
+                                clientWriter.println();
+                                clientWriter.flush();
                             }
 
                             System.out.printf("[%s] %s>", currentRoomId, identity);
@@ -649,6 +699,12 @@ public class Peer {
                                     askQuit();
                                     currentConnection = false;
                                     break;
+                                case  "shout":
+                                    askShout();
+                                    break;
+                                default:
+                                    System.out.println("Invalid command, use #help to see instructions");
+                                    break;
                             }
                         }
                     }
@@ -687,6 +743,12 @@ public class Peer {
                 clientWriter.println();
                 clientWriter.flush();
                 return;
+            }
+
+            public synchronized void askShout() {
+                General command = new General(Types.SHOUT.type);
+                command.setShoutIdentity(identity);
+                command.setShoutedList(new ArrayList<>());
             }
         }
 
