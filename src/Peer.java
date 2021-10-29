@@ -34,6 +34,7 @@ public class Peer {
     private boolean client_alive = true;
     private String identity;
     private String currentRoomId;
+    private ClientConnection clientConnection;
 
     public Peer() {
         users = new ArrayList<>();
@@ -305,9 +306,9 @@ public class Peer {
             currentConnection = true;
 
 
-            clientConnection conn = new clientConnection(socket);
-            if (conn != null) {
-                conn.run();
+            clientConnection = new ClientConnection(socket);
+            if (clientConnection != null) {
+                clientConnection.run();
             }
             else
                 System.out.println("Connection failed");
@@ -377,6 +378,8 @@ public class Peer {
                     connection_alive = false;
                 } else if (Types.JOIN.type.equals(message.getType())){
                     joinRoom(message);
+                } else if (Types.SHOUT.type.equals(message.getType())) {
+                    replyForShout(message);
                 }
             }
 
@@ -486,19 +489,37 @@ public class Peer {
             }
         }
 
+        public synchronized void replyForShout(General message) {
+            if (message.getShoutedList().contains(identity))
+                return;
+
+            System.out.printf("%s shouted", message.getShoutIdentity());
+            General command = new General(Types.SHOUT.type);
+            command.setShoutIdentity(identity);
+            message.getShoutedList().add(identity);
+            command.setShoutedList(message.getShoutedList());
+
+            for (ServerConnection serverConnection:serverConnections){
+                serverConnection.sendMessage(gson.toJson(command));
+            }
+            if (clientConnection != null && !clientConnection.socket.isClosed()) {
+                clientConnection.sendMessage(gson.toJson(command));
+            }
+
+        }
 
 
 
     }
 
-    class clientConnection extends Thread {
+    class ClientConnection extends Thread {
         private Socket socket;
         private PrintWriter clientWriter;
         private BufferedReader clientReader;
         private String identity;
         private String currentRoomId;
 
-        public clientConnection(Socket socket) throws IOException {
+        public ClientConnection(Socket socket) throws IOException {
             this.socket = socket;
             this.clientReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             this.clientWriter = new PrintWriter(socket.getOutputStream());
@@ -530,6 +551,12 @@ public class Peer {
             System.out.printf("[%s] %s>", currentRoomId, identity);
             new Thread(new InputMsg()).start();
             new Thread(new OutputMsg()).start();
+        }
+
+        private void sendMessage(String message){
+            clientWriter.print(message);
+            clientWriter.println();
+            clientWriter.flush();
         }
 
         private class InputMsg implements Runnable {
@@ -598,6 +625,22 @@ public class Peer {
                                     if (fromServer.getIdentity().equals(identity))
                                         currentRoomId = fromServer.getRoomid();
                                 }
+                            } else if (fromServer.getType().equals(Types.SHOUT.type)) {
+                                if (fromServer.getShoutedList().contains(identity))
+                                    continue;
+
+                                System.out.printf("%s shouted", fromServer.getShoutIdentity());
+                                General command = new General(Types.SHOUT.type);
+                                command.setShoutIdentity(identity);
+                                fromServer.getShoutedList().add(identity);
+                                command.setShoutedList(fromServer.getShoutedList());
+                                System.out.printf("%s shouted",fromServer.getShoutIdentity());
+                                for (ServerConnection serverConnection:serverConnections){
+                                    serverConnection.sendMessage(gson.toJson(command));
+                                }
+                                clientWriter.print(gson.toJson(command));
+                                clientWriter.println();
+                                clientWriter.flush();
                             }
 
                             System.out.printf("[%s] %s>", currentRoomId, identity);
@@ -655,6 +698,12 @@ public class Peer {
                                     askQuit();
                                     currentConnection = false;
                                     break;
+                                case  "shout":
+                                    askShout();
+                                    break;
+                                default:
+                                    System.out.println("Invalid command, use #help to see instructions");
+                                    break;
                             }
                         }
                     }
@@ -693,6 +742,12 @@ public class Peer {
                 clientWriter.println();
                 clientWriter.flush();
                 return;
+            }
+
+            public synchronized void askShout() {
+                General command = new General(Types.SHOUT.type);
+                command.setShoutIdentity(identity);
+                command.setShoutedList(new ArrayList<>());
             }
         }
 

@@ -19,6 +19,8 @@ public class General {
     private String content;
     private String host;
     private List<String> neighbors;
+    private String shoutIdentity;
+    private List<String> shoutedList;
 
     public General(String type) {
         this.type = type;
@@ -101,6 +103,22 @@ public class General {
 
     public void setNeighbors(List<String> neighbors) {
         this.neighbors = neighbors;
+    }
+
+    public String getShoutIdentity() {
+        return shoutIdentity;
+    }
+
+    public void setShoutIdentity(String shoutIdentity) {
+        this.shoutIdentity = shoutIdentity;
+    }
+
+    public List<String> getShoutedList() {
+        return shoutedList;
+    }
+
+    public void setShoutedList(List<String> shoutedList) {
+        this.shoutedList = shoutedList;
     }
 
     @Override

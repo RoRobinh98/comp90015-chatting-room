@@ -20,7 +20,8 @@ public enum Types {
     QUIT("quit"),
     HOSTCHANGE("hostchange"),
     NEIGHBORS("neighbors"),
-    LISTNEIGHBORS("listneighbors"),;
+    LISTNEIGHBORS("listneighbors"),
+    SHOUT("shout");
 
     public String type;
     Types(String type) {
