@@ -486,11 +486,16 @@ public class Peer {
 
 //            System.out.printf("%s shouted", message.getShoutIdentity());
             General command = new General(Types.SHOUT.type);
-            command.setShoutIdentity(identity);
-            message.getShoutedList().add(identity);
-            command.setShoutedList(message.getShoutedList());
+            command.setShoutIdentity(message.getShoutIdentity());
+         //   message.getShoutedList().add(identity);
 
+            for (ServerConnection serverConnection:serverConnections) {
+                if (!serverConnection.user.getRoomid().equals(null) || !serverConnection.user.getRoomid().equals(""))
+                    message.getShoutedList().add(serverConnection.user.getIdentity());
+            }
+            command.setShoutedList(message.getShoutedList());
             for (ServerConnection serverConnection:serverConnections){
+                if(!serverConnection.user.getRoomid().equals(null) || !serverConnection.user.getRoomid().equals(""))
                 serverConnection.sendMessage(gson.toJson(command));
             }
             if (clientConnection != null && !clientConnection.socket.isClosed()) {
@@ -618,8 +623,8 @@ public class Peer {
                                         currentRoomId = fromServer.getRoomid();
                                 }
                             } else if (fromServer.getType().equals(Types.SHOUT.type)) {
-                                if (fromServer.getShoutedList().contains(identity))
-                                    continue;
+//                                if (fromServer.getShoutedList().contains(identity))
+//                                    continue;
 
                                 System.out.printf("%s shouted", fromServer.getShoutIdentity());
                                 System.out.println();
