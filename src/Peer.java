@@ -740,6 +740,10 @@ public class Peer {
                 General command = new General(Types.SHOUT.type);
                 command.setShoutIdentity(identity);
                 command.setShoutedList(new ArrayList<>());
+                clientWriter.print(gson.toJson(command));
+                clientWriter.println();
+                clientWriter.flush();
+                return;
             }
         }
 
