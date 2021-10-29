@@ -270,22 +270,6 @@ public class Peer {
             }
         }
 
-
-        public void askHelp(){
-            System.out.println("Local Command:");
-            System.out.println("#createroom - create a chat room");
-            System.out.println("#delete [room identity] - delete a chat room:");
-            System.out.println("#kick [user identity] - kick the user and block them from reconnecting");
-            System.out.println("#help - list the command information");
-            System.out.println("Remote Command:");
-            System.out.println("#join [room identity] - join a chat room within connected peer");
-            System.out.println("#who [room identity] - list all users in chat room:");
-            System.out.println("#quit - disconnect from a peer");
-            System.out.println("#listneighbors - list all currently connected peers' network address");
-            System.out.println("#connect IP[:port] [local port] - connect to another peer");
-            System.out.println("Special Command:");
-            System.out.println("#searchnetwork - list all connected IP address in the network");
-        }
     }
 
 
@@ -691,6 +675,9 @@ public class Peer {
                                     askQuit();
                                     currentConnection = false;
                                     break;
+                                case "help":
+                                    askHelp();
+                                    break;
                                 case  "shout":
                                     askShout();
                                     break;
@@ -851,5 +838,21 @@ public class Peer {
         }
 
         return null;
+    }
+
+    public void askHelp(){
+        System.out.println("Local Command:");
+        System.out.println("#createroom - create a chat room");
+        System.out.println("#delete [room identity] - delete a chat room:");
+        System.out.println("#kick [user identity] - kick the user and block them from reconnecting");
+        System.out.println("#help - list the command information");
+        System.out.println("Remote Command:");
+        System.out.println("#join [room identity] - join a chat room within connected peer");
+        System.out.println("#who [room identity] - list all users in chat room:");
+        System.out.println("#quit - disconnect from a peer");
+        System.out.println("#listneighbors - list all currently connected peers' network address");
+        System.out.println("#connect IP[:port] [local port] - connect to another peer");
+        System.out.println("Special Command:");
+        System.out.println("#searchnetwork - list all connected IP address in the network");
     }
 }
