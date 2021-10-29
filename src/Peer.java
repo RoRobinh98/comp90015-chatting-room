@@ -86,7 +86,7 @@ public class Peer {
         }
 
         public void serverHandle(int portNum) {
-            //ServerSocket serverSocket;
+            ServerSocket serverSocket;
             try {
                 serverSocket = new ServerSocket(portNum);
 
@@ -466,14 +466,13 @@ public class Peer {
         }
 
         public synchronized void replyForShout(General message) {
-            String serverIdentity = serverSocket.getLocalSocketAddress()+":"+serverSocket.getLocalPort();
-            if (message.getShoutedList().contains(serverIdentity))
+            if (message.getShoutedList().contains(identity))
                 return;
 
 //            System.out.printf("%s shouted", message.getShoutIdentity());
             General command = new General(Types.SHOUT.type);
             command.setShoutIdentity(message.getShoutIdentity());
-            message.getShoutedList().add(serverIdentity);
+            message.getShoutedList().add(identity);
             command.setShoutedList(message.getShoutedList());
             for (ServerConnection serverConnection:serverConnections){
                 if(!serverConnection.user.getRoomid().equals(null) || !serverConnection.user.getRoomid().equals(""))
@@ -481,6 +480,8 @@ public class Peer {
             }
             if (clientConnection != null && !clientConnection.socket.isClosed()) {
                 clientConnection.sendMessage(gson.toJson(command));
+                System.out.printf("%s shouted",message.getShoutIdentity());
+                System.out.println();
             }
 
         }
