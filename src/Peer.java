@@ -481,18 +481,13 @@ public class Peer {
         }
 
         public synchronized void replyForShout(General message) {
-//            if (message.getShoutedList().contains(identity))
-//                return;
+            if (message.getShoutedList().contains(identity))
+                return;
 
 //            System.out.printf("%s shouted", message.getShoutIdentity());
             General command = new General(Types.SHOUT.type);
             command.setShoutIdentity(message.getShoutIdentity());
-         //   message.getShoutedList().add(identity);
-
-            for (ServerConnection serverConnection:serverConnections) {
-                if (!serverConnection.user.getRoomid().equals(null) || !serverConnection.user.getRoomid().equals(""))
-                    message.getShoutedList().add(serverConnection.user.getIdentity());
-            }
+            message.getShoutedList().add(identity);
             command.setShoutedList(message.getShoutedList());
             for (ServerConnection serverConnection:serverConnections){
                 if(!serverConnection.user.getRoomid().equals(null) || !serverConnection.user.getRoomid().equals(""))
@@ -623,8 +618,8 @@ public class Peer {
                                         currentRoomId = fromServer.getRoomid();
                                 }
                             } else if (fromServer.getType().equals(Types.SHOUT.type)) {
-//                                if (fromServer.getShoutedList().contains(identity))
-//                                    continue;
+                                if (fromServer.getShoutedList().contains(identity))
+                                    continue;
 
                                 System.out.printf("%s shouted", fromServer.getShoutIdentity());
                                 System.out.println();
@@ -633,11 +628,12 @@ public class Peer {
                                 fromServer.getShoutedList().add(identity);
                                 command.setShoutedList(fromServer.getShoutedList());
                                 for (ServerConnection serverConnection:serverConnections){
+                                    if(!serverConnection.user.getRoomid().equals(null) || !serverConnection.user.getRoomid().equals(""))
                                     serverConnection.sendMessage(gson.toJson(command));
                                 }
-                                clientWriter.print(gson.toJson(command));
-                                clientWriter.println();
-                                clientWriter.flush();
+//                                clientWriter.print(gson.toJson(command));
+//                                clientWriter.println();
+//                                clientWriter.flush();
                             }
 
                             System.out.printf("[%s] %s>", currentRoomId, identity);
