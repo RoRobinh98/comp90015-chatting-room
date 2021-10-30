@@ -472,18 +472,19 @@ public class Peer {
 //            System.out.printf("%s shouted", message.getShoutIdentity());
             General command = new General(Types.SHOUT.type);
             command.setShoutIdentity(message.getShoutIdentity());
-            message.getShoutedList().add(identity);
+
             command.setShoutedList(message.getShoutedList());
-            for (ServerConnection serverConnection:serverConnections){
-                if(!serverConnection.user.getRoomid().equals(null) || !serverConnection.user.getRoomid().equals(""))
-                serverConnection.sendMessage(gson.toJson(command));
-            }
             if (clientConnection != null && !clientConnection.socket.isClosed()) {
+                message.getShoutedList().add(identity);
                 clientConnection.sendMessage(gson.toJson(command));
                 System.out.printf("%s shouted",message.getShoutIdentity());
                 System.out.println();
             }
 
+            for (ServerConnection serverConnection:serverConnections){
+                if(!serverConnection.user.getRoomid().equals(null) || !serverConnection.user.getRoomid().equals(""))
+                serverConnection.sendMessage(gson.toJson(command));
+            }
         }
 
 
