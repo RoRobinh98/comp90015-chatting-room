@@ -23,6 +23,8 @@ public class Peer {
     private boolean currentConnection = false;
     private String target;
     private List<String> blackList;
+    private int portP;
+    private int portI;
 
     //Server side
     private boolean server_alive = false;
@@ -37,12 +39,14 @@ public class Peer {
     private String currentRoomId;
     private ClientConnection clientConnection;
 
-    public Peer() {
+    public Peer(int portP, int portI) {
         users = new ArrayList<>();
         chatRooms = new ArrayList<>();
         //chatRooms.add(new ChatRoom(COMMONSPACE));
         serverConnections = new ArrayList<>();
         blackList = new ArrayList<>();
+        this.portP = portP;
+        this.portI = portI;
     }
 
     public static void main(String[] args) {
@@ -51,13 +55,13 @@ public class Peer {
 
         try {
             parser.parseArgument(args);
-            Peer peer = new Peer();
+            Peer peer = new Peer(cmdCommand.portP, cmdCommand.portI);
             PeerClient peerClient = peer.new PeerClient();
             PeerServer peerServer = peer.new PeerServer();
             new Thread(peerClient).start();
             new Thread(peerServer).start();
         } catch (CmdLineException e) {
-            System.out.println("command lien error");
+            System.out.println("command line error");
             e.printStackTrace();
         }
 
@@ -78,7 +82,7 @@ public class Peer {
         @Override
         public void run() {
             try {
-                serverHandle(4444);
+                serverHandle(portP);
             } catch (Exception e) {
                 System.out.println("command lien error");
                 e.printStackTrace();
@@ -96,12 +100,12 @@ public class Peer {
                 while (server_alive) {
                     Socket newSocket = serverSocket.accept();
 
-                    System.out.println(newSocket.getInetAddress().getHostAddress());
-                    System.out.println(newSocket.getPort());
+                 //   System.out.println(newSocket.getInetAddress().getHostAddress());
+                 //   System.out.println(newSocket.getPort());
                     ServerConnection conn = new ServerConnection(newSocket);
 
                     if (conn != null) {
-                        System.out.printf("Accepted new connection from %s:%d\n", newSocket.getLocalAddress().getCanonicalHostName(), newSocket.getPort());
+                 //       System.out.printf("Accepted new connection from %s:%d\n", newSocket.getLocalAddress().getCanonicalHostName(), newSocket.getPort());
                         enter(conn);
                         conn.start();
                         conn.interrupt();
@@ -142,7 +146,7 @@ public class Peer {
                                 if(inputPart.length == 3)
                                     localPort = inputPart[2];
                                 else
-                                    localPort = null;
+                                    localPort = portI+"";
                                 clientHandle(targetAddress, targetPort,localPort);
 
                                 break;

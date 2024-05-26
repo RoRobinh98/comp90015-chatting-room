@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/DS_Assignment1_Src.iml" filepath="$PROJECT_DIR$/DS_Assignment1_Src.iml" />
+      <module fileurl="file://$PROJECT_DIR$/chatpeer.iml" filepath="$PROJECT_DIR$/chatpeer.iml" />
     </modules>
   </component>
 </project>
